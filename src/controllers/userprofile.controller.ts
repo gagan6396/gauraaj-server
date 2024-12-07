@@ -11,7 +11,7 @@ import { triggerAsyncId } from "async_hooks";
 import historyModel from "../models/History.model";
 
 // User Profile Routes
-const getUserProfile = async (req: Request, res: Response) => {
+const getUserProfile = async (req: Request, res: Response) => {  
   try {
     const { userId } = req.params;
 
