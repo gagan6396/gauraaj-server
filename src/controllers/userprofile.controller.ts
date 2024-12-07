@@ -9,9 +9,10 @@ import LoyaltyPointModel from "../models/LoyaltyPoint.model";
 import NotificationModel from "../models/Notification.model";
 import { triggerAsyncId } from "async_hooks";
 import historyModel from "../models/History.model";
+import { redisClient } from "../config/redisClient";
 
 // User Profile Routes
-const getUserProfile = async (req: Request, res: Response) => {  
+const getUserProfile = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
 
@@ -19,15 +20,33 @@ const getUserProfile = async (req: Request, res: Response) => {
       return apiResponse(res, 400, false, "Please provide a userId");
     }
 
-    // Find user by userId
+    // Ensure Redis client is connected before using it
+    if (!redisClient.isOpen) {
+      console.log("Redis client not connected, reconnecting...");
+      await redisClient.connect();
+    }
+
+    // Check if the user profile is cached
+    const cacheKey = `user:profile:${userId}`;
+    const cachedProfile = await redisClient.get(cacheKey);
+    if (cachedProfile) {
+      console.log("Serving user profile from cache");
+      return apiResponse(
+        res,
+        200,
+        true,
+        "User profile fetched successfully (from cache)",
+        JSON.parse(cachedProfile)
+      );
+    }
+
+    // Fetch user and profile from the database
     const user = await userModel.findById(userId);
     if (!user) {
       return apiResponse(res, 404, false, "User not found");
     }
 
-    // Fetch the profile using the user's ID
     const profileExist = await profileModel.findOne({ user_id: user._id });
-
     if (!profileExist) {
       return apiResponse(
         res,
@@ -37,7 +56,7 @@ const getUserProfile = async (req: Request, res: Response) => {
       );
     }
 
-    // Safely combine user and profile data
+    // Combine user and profile data
     const userProfile = {
       first_name: user.first_name,
       last_name: user.last_name,
@@ -49,6 +68,16 @@ const getUserProfile = async (req: Request, res: Response) => {
       orderList: profileExist.orderList || [],
       wishList: profileExist.wishList || [],
     };
+
+    // Cache the user profile for 1 hour (3600 seconds)
+    const cacheResult = await redisClient.setEx(
+      cacheKey,
+      3600,
+      JSON.stringify(userProfile)
+    );
+    if (cacheResult === "OK") {
+      console.log("User profile cached successfully");
+    }
 
     return apiResponse(
       res,
@@ -80,41 +109,79 @@ const updateUserProfile = async (req: Request, res: Response) => {
       shoppingAddress,
     } = req.body;
 
-    // Check the user exist with this userid or not
+    // Fetch user and profile
     const userExist = await userModel.findById(userId);
     if (!userExist) {
       return apiResponse(res, 404, false, "User not found");
     }
 
-    // Fetch the profile for this user
-    const profileExist = await profileModel.findOne({
-      user_id: userExist._id,
-    });
-
+    const profileExist = await profileModel.findOne({ user_id: userExist._id });
     if (!profileExist) {
       return apiResponse(res, 404, false, "Profile not found");
     }
 
+    // Update user data
     if (first_name) userExist.first_name = first_name;
     if (last_name) userExist.last_name = last_name;
     if (email) userExist.email = email;
     if (phone) userExist.phone = phone;
 
-    // Prepare the profile data
-    if (profileImage) userExist.profimeImage = profileImage;
-    if (shoppingAddress)
+    // Update profile data
+    if (profileImage) profileExist.profileImage = profileImage;
+    if (shoppingAddress) {
       profileExist.shoppingAddress = {
         ...profileExist.shoppingAddress,
         ...shoppingAddress,
       };
+    }
 
-    // save both models
+    // Save changes to the database
     await userExist.save();
     await profileExist.save();
 
-    return apiResponse(res, 200, true, "User profile updated Successfully");
+    // Prepare updated profile data
+    const updatedUserProfile = {
+      first_name: userExist.first_name,
+      last_name: userExist.last_name,
+      email: userExist.email,
+      phone: userExist.phone,
+      role: userExist.role,
+      profileImage: profileExist.profileImage || "",
+      shoppingAddress: profileExist.shoppingAddress || {},
+      orderList: profileExist.orderList || [],
+      wishList: profileExist.wishList || [],
+    };
+
+    // Update Redis cache
+    const cacheKey = `user:profile:${userId}`;
+    if (!redisClient.isOpen) {
+      console.log("Redis client not open, reconnecting...");
+      await redisClient.connect();
+    }
+
+    await redisClient.del(cacheKey);
+
+    const cacheSetResult = await redisClient.setEx(
+      cacheKey,
+      3600,
+      JSON.stringify(updatedUserProfile)
+    );
+
+    if (cacheSetResult === "OK") {
+      console.log("Cache updated successfully for key:", cacheKey);
+    } else {
+      console.error("Failed to update cache for key:", cacheKey);
+    }
+
+    return apiResponse(
+      res,
+      200,
+      true,
+      "User profile updated successfully",
+      updatedUserProfile
+    );
   } catch (error) {
-    console.error("Error while Updating userProfile", error);
+    console.error("Error while updating user profile", error);
     return apiResponse(res, 500, false, "Internal server error");
   }
 };
