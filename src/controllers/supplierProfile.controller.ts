@@ -1,6 +1,7 @@
 import supplierModel from "../models/Supplier.model";
 import { Response, Request } from "express";
 import apiResponse from "../utils/ApiResponse";
+import { redisClient } from "../config/redisClient";
 
 // Supplier Profile managment Controller
 const getSupplierProfile = async (req: Request, res: Response) => {
@@ -9,6 +10,21 @@ const getSupplierProfile = async (req: Request, res: Response) => {
 
     if (!supplierId) {
       return apiResponse(res, 400, false, "Supplier ID is required");
+    }
+
+    // Check Redis cache first
+    const cachedSupplierProfile = await redisClient.get(
+      `supplierProfile:${supplierId}`
+    );
+    if (cachedSupplierProfile) {
+      console.log("Returning supplier profile from cache.");
+      return apiResponse(
+        res,
+        200,
+        true,
+        "Supplier profile fetched successfully (from cache)",
+        JSON.parse(cachedSupplierProfile)
+      );
     }
 
     const supplier = await supplierModel
@@ -21,6 +37,10 @@ const getSupplierProfile = async (req: Request, res: Response) => {
     if (!supplier) {
       return apiResponse(res, 404, false, "Supplier not found");
     }
+
+    // Cached the supplier Profile
+    const cacheKey = `supplierProfile:${supplierId}`;
+    await redisClient.setEx(cacheKey, 3600, JSON.stringify(supplier));
 
     return apiResponse(
       res,
@@ -75,6 +95,27 @@ const updateSupplierProfile = async (req: Request, res: Response) => {
     }
 
     const updatedSupplier = await supplier.save();
+
+    // Storing updatedProfile as Cached
+    const cacheKey = `supplierProfile:${supplierId}`;
+    if (!redisClient.isOpen) {
+      console.log("Connecting to RedisClient...");
+      redisClient.connect();
+    }
+
+    await redisClient.del(cacheKey);
+
+    const cahceSetResult = await redisClient.setEx(
+      cacheKey,
+      3600,
+      JSON.stringify(updatedSupplier)
+    );
+
+    if (cahceSetResult == "OK") {
+      console.log("Cache Set Successfully", cacheKey);
+    } else {
+      console.log("Cache Set Failed", cacheKey);
+    }
 
     return apiResponse(
       res,

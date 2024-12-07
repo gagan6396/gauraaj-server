@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import app from "./src/app";
+import { connectRedis } from "./src/config/redisClient";
 
 dotenv.config();
 
@@ -19,6 +20,9 @@ const startServer = async () => {
     // Connect to the database
     await mongoose.connect(DbURL);
     console.log("🚀 Connected to MongoDB successfully!");
+
+    // Connecting with redis
+    await connectRedis();
 
     // Start the server
     app
