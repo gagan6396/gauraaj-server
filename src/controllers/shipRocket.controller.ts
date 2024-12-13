@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import {
   createShipRocketOrder,
-  cancelShipRocketOrder,
+  // cancelShipRocketOrder,
   returnShipRocketOrder,
 } from "../services/shipRocket.service";
 import apiResponse from "../utils/ApiResponse";
@@ -59,28 +59,28 @@ export const createOrder = async (
   }
 };
 
-export const cancelOrder = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const { orderId } = req.body;
+// export const cancelOrder = async (
+//   req: Request,
+//   res: Response,
+//   next: NextFunction
+// ): Promise<void> => {
+//   try {
+//     const { orderId } = req.body;
 
-    // Check if orderId is provided
-    if (!orderId) {
-      return apiResponse(res, 400, false, "Order ID is required");
-    }
+//     // Check if orderId is provided
+//     if (!orderId) {
+//       return apiResponse(res, 400, false, "Order ID is required");
+//     }
 
-    // Cancel the order via ShipRocket
-    const result = await cancelShipRocketOrder(orderId);
+//     // Cancel the order via ShipRocket
+//     const result = await cancelShipRocketOrder(orderId);
 
-    return apiResponse(res, 200, true, "Order cancelled successfully", result);
-  } catch (error: any) {
-    console.error("Error while canceling order:", error);
-    return apiResponse(res, 500, false, "Error while canceling order");
-  }
-};
+//     return apiResponse(res, 200, true, "Order cancelled successfully", result);
+//   } catch (error: any) {
+//     console.error("Error while canceling order:", error);
+//     return apiResponse(res, 500, false, "Error while canceling order");
+//   }
+// };
 
 export const returnOrderController = async (
   req: Request,

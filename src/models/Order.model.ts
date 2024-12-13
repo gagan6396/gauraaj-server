@@ -9,6 +9,7 @@ export interface Order extends Document {
     productId: mongoose.Types.ObjectId;
     quantity: number;
   }[];
+  shipRocketOrderId?: number;
   shippingAddressId: mongoose.Types.ObjectId;
   payment_id: mongoose.Types.ObjectId;
 }
@@ -49,6 +50,10 @@ const OrderSchema: Schema<Order> = new Schema(
         },
       },
     ],
+    shipRocketOrderId: {
+      type: Number,
+      required: false,
+    },
     shippingAddressId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Profile",
