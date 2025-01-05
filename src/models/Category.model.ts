@@ -5,9 +5,10 @@ export interface ICategory extends Document {
   name: string;
   description: string;
   image?: string;
-  parentCategoryId?: mongoose.Types.ObjectId;
+  parentCategoryId?: mongoose.Types.ObjectId | null; // Nullable for top-level categories
   status: boolean;
   slug: string;
+  skuParameters?: Record<string, string[]>; // Map of SKU parameters
   createdAt: Date;
   updatedAt: Date;
 }
@@ -41,11 +42,15 @@ const categorySchema = new mongoose.Schema<ICategory>(
       required: true,
       unique: true,
     },
+    skuParameters: {
+      type: Map,
+      of: [String],
+      default: {}, // Initialize as an empty object
+    },
   },
   { timestamps: true }
 );
 
-// Category Model
 const categoryModel =
   mongoose.models.Category ||
   mongoose.model<ICategory>("Category", categorySchema);
