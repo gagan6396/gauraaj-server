@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from "mongoose";
+import mongoose, { Document, Schema } from "mongoose";
 
 export interface Supplier extends Document {
   username: string;
@@ -20,6 +20,7 @@ export interface Supplier extends Document {
   inventoryCount: number;
   totalSales: number;
   averageRating: number;
+  token: string;
   approval_status: "Pending" | "Approved" | "Rejected";
   totalOrders: number;
   passwordResetOTP: number;
@@ -77,6 +78,9 @@ const supplierSchema: Schema<Supplier> = new Schema(
       },
     },
     profileImage: {
+      type: String,
+    },
+    token: {
       type: String,
     },
     products: [

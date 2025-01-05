@@ -1,12 +1,12 @@
-import supplierModel from "../models/Supplier.model";
-import { Response, Request } from "express";
-import apiResponse from "../utils/ApiResponse";
 import bcrypt from "bcrypt";
+import { Request, Response } from "express";
+import jwt from "jsonwebtoken"; // Import JWT library
 import adminModel from "../models/Admin.model";
+import supplierModel from "../models/Supplier.model";
+import apiResponse from "../utils/ApiResponse";
+import { sendOtpEmail } from "../utils/EmailHelper";
 import { sendEmailToAdmins } from "../utils/EmailSend";
 import { generateToken } from "../utils/jwtHelper";
-import { sendOtpEmail } from "../utils/EmailHelper";
-
 const saltRounds = 10;
 
 const registerSupplier = async (req: Request, res: Response) => {
@@ -35,7 +35,7 @@ const registerSupplier = async (req: Request, res: Response) => {
     // Hash the password
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    // Create a new supplier with "pending" approval status
+    // Create a new supplier with "pending" approval status (but no token yet)
     const newSupplier = new supplierModel({
       username,
       email,
@@ -46,13 +46,25 @@ const registerSupplier = async (req: Request, res: Response) => {
       approval_status: "Pending",
     });
 
+    // Save the supplier to the database
     const savedSupplier = await newSupplier.save();
 
+    // Generate JWT token after supplier is saved
+    const token = jwt.sign(
+      { supplier_id: savedSupplier._id, email: savedSupplier.email },
+      process.env.JWT_SECRET || "your_secret_key", // Use your secret key
+      { expiresIn: "1d" } // Token expiration (1 day in this example)
+    );
+
+    // Save token in the supplier document if needed (optional)
+    savedSupplier.token = token;
+    await savedSupplier.save();
+
+    // Send email to admins for approval
     const admins = await adminModel.find();
     if (admins.length > 0) {
       const adminEmails = admins.map((admin) => admin.email);
 
-      // Send email to admins for approval
       const emailSubject = "New Supplier Registration Approval Request";
       const emailHtml = `
         <p>A new supplier has registered on the platform:</p>
@@ -73,8 +85,8 @@ const registerSupplier = async (req: Request, res: Response) => {
       true,
       "Registration successful. Approval request sent to admins.",
       {
-        supplier_id: newSupplier._id,
-        savedSupplier,
+        supplier_id: savedSupplier._id,
+        token,
       }
     );
   } catch (error) {
@@ -86,6 +98,12 @@ const registerSupplier = async (req: Request, res: Response) => {
 const loginSupplier = async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
+    console.log(
+      "Supplier login attempt with email:",
+      email,
+      "and password:",
+      password
+    );
 
     if (!email || !password) {
       return apiResponse(res, 400, false, "Email and password are required.");
@@ -96,6 +114,7 @@ const loginSupplier = async (req: Request, res: Response) => {
     if (!supplier) {
       return apiResponse(res, 404, false, "Supplier not found.");
     }
+    console.log("supplier", supplier);
 
     if (supplier.approval_status !== "Approved") {
       return apiResponse(
@@ -223,9 +242,10 @@ const supplierLogOut = async (req: Request, res: Response) => {
 };
 
 export {
-  registerSupplier,
   loginSupplier,
+  registerSupplier,
   supplierForgatPassword,
-  supplierResetPassword,
   supplierLogOut,
+  supplierResetPassword
 };
+
