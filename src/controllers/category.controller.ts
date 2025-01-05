@@ -1,5 +1,5 @@
 import apiResponse from "../utils/ApiResponse";
-import categoryModel from "../models/Category.model";
+import categoryModel, { ICategory } from "../models/Category.model";
 import { Request, Response } from "express";
 import mongoose from "mongoose";
 import slugify from "slugify";
@@ -209,34 +209,83 @@ const subCategoryFetching = async (req: Request, res: Response) => {
   }
 };
 
+// const createSubCategory = async (req: Request, res: Response) => {
+//   try {
+//     const { categoryId } = req.params; // Parent category ID (e.g., Electronics)
+//     const { name, description, image } = req.body;
+
+//     // Check if required fields are provided
+//     if (!name || !description) {
+//       return apiResponse(res, 400, false, "Name and description are required");
+//     }
+
+//     let slug = req.body.slug;
+//     if (!slug) {
+//       slug = slugify(name, { lower: true });
+//     }
+
+//     // Check if parent category exists
+//     const parentCategory = await categoryModel.findById(categoryId);
+//     if (!parentCategory) {
+//       return apiResponse(res, 404, false, "Parent category not found");
+//     }
+
+//     // Create new subcategory and link to the parent category
+//     const newSubCategory = new categoryModel({
+//       name,
+//       description,
+//       slug,
+//       image,
+//       parentCategoryId: categoryId, // Link to the parent category
+//     });
+
+//     await newSubCategory.save();
+
+//     return apiResponse(
+//       res,
+//       201,
+//       true,
+//       "Subcategory created successfully",
+//       newSubCategory
+//     );
+//   } catch (error) {
+//     console.error("Error creating subcategory:", error);
+//     return apiResponse(res, 500, false, "Internal server error");
+//   }
+// };
+
 const createSubCategory = async (req: Request, res: Response) => {
   try {
-    const { categoryId } = req.params; // Parent category ID (e.g., Electronics)
-    const { name, description, image } = req.body;
+    const { categoryId } = req.params;
+    const { name, description, image, skuParameters } = req.body;
 
-    // Check if required fields are provided
+    // Validate required fields
     if (!name || !description) {
       return apiResponse(res, 400, false, "Name and description are required");
     }
 
-    let slug = req.body.slug;
-    if (!slug) {
-      slug = slugify(name, { lower: true });
-    }
+    // Generate slug if not provided
+    let slug = req.body.slug || slugify(name, { lower: true });
 
-    // Check if parent category exists
+    // Validate parent category existence
     const parentCategory = await categoryModel.findById(categoryId);
     if (!parentCategory) {
       return apiResponse(res, 404, false, "Parent category not found");
     }
 
-    // Create new subcategory and link to the parent category
+    // Validate SKU parameters
+    if (skuParameters && typeof skuParameters !== "object") {
+      return apiResponse(res, 400, false, "Invalid SKU parameters format");
+    }
+
+    // Create subcategory and link it to the parent
     const newSubCategory = new categoryModel({
       name,
       description,
       slug,
       image,
-      parentCategoryId: categoryId, // Link to the parent category
+      parentCategoryId: categoryId,
+      skuParameters,
     });
 
     await newSubCategory.save();
@@ -353,6 +402,46 @@ const fetchProductBySubCategory = async (req: Request, res: Response) => {
   }
 
   return apiResponse(res, 200, true, "Products fetched successfully", products);
+};
+
+export const getSubcategorySkuParameters = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { categoryId, subCategoryId } = req.params;
+
+    console.log("Category ID:", categoryId); // Log categoryId
+    console.log("Subcategory ID:", subCategoryId); // Log subcategoryId
+
+    // Fetch the subcategory and check if it belongs to the provided categoryId
+    const subcategory = await categoryModel
+      .findOne({ _id: subCategoryId, parentCategoryId: categoryId })
+      .lean<ICategory>();
+
+    // Log the result to see if the query returns anything
+    console.log("Fetched subcategory:", subcategory);
+
+    // Check if subcategory exists and belongs to the specified parent category
+    if (!subcategory) {
+      return apiResponse(
+        res,
+        404,
+        false,
+        "Subcategory not found under this category"
+      );
+    }
+
+    // Retrieve SKU parameters from the subcategory (if any)
+    const skuParameters = subcategory.skuParameters || {};
+
+    return apiResponse(res, 200, true, "SKU parameters fetched successfully", {
+      skuParameters,
+    });
+  } catch (error) {
+    console.error("Error fetching SKU parameters:", error);
+    return apiResponse(res, 500, false, "Internal server error");
+  }
 };
 
 export {

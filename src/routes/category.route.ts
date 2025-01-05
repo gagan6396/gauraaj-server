@@ -11,6 +11,7 @@ import {
   fetchCategoryById,
   fetchSubCategoryById,
   fetchProductBySubCategory,
+  getSubcategorySkuParameters,
 } from "../controllers/category.controller";
 import {
   createCategorySchema,
@@ -49,5 +50,11 @@ categoryRoute.delete(
 
 // SubCategory Product
 categoryRoute.get("/subcategory/:subCategoryId", fetchProductBySubCategory);
+
+// GetSubcategoryParameters
+categoryRoute.get(
+  "/:categoryId/subcategory/:subCategoryId/parameters",
+  getSubcategorySkuParameters
+);
 
 export default categoryRoute;
