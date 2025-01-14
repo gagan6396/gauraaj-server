@@ -275,6 +275,11 @@ const createSubCategory = async (req: Request, res: Response) => {
       return apiResponse(res, 404, false, "Parent category not found");
     }
 
+    // Validate SKU parameters
+    if (skuParameters && typeof skuParameters !== "object") {
+      return apiResponse(res, 400, false, "Invalid SKU parameters format");
+    }
+
     return apiResponse(res, 201, true, "Subcategory created successfully", {
       name,
       description,
@@ -284,11 +289,6 @@ const createSubCategory = async (req: Request, res: Response) => {
       slug,
       parentCategory,
     });
-
-    // Validate SKU parameters
-    if (skuParameters && typeof skuParameters !== "object") {
-      return apiResponse(res, 400, false, "Invalid SKU parameters format");
-    }
 
     // Create subcategory and link it to the parent
     const newSubCategory = new categoryModel({
