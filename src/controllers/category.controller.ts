@@ -14,6 +14,11 @@ const createCategory = async (req: Request, res: Response) => {
     console.log("imageUrl", imageUrl);
     console.log("imageUrls", imageUrls);
 
+    return apiResponse(res, 201, true, "Category created successfully", {
+      imageUrl: imageUrl,
+      imageUrls,
+    });
+
     if (!name || !description) {
       return apiResponse(res, 400, false, "Name and description are required");
     }
