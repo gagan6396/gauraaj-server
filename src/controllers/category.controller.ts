@@ -269,6 +269,12 @@ const createSubCategory = async (req: Request, res: Response) => {
 
     console.log({ name, description, image, skuParameters, categoryId, slug });
 
+    // Validate parent category existence
+    const parentCategory = await categoryModel.findById(categoryId);
+    if (!parentCategory) {
+      return apiResponse(res, 404, false, "Parent category not found");
+    }
+
     return apiResponse(res, 201, true, "Subcategory created successfully", {
       name,
       description,
@@ -276,13 +282,8 @@ const createSubCategory = async (req: Request, res: Response) => {
       skuParameters,
       categoryId,
       slug,
+      parentCategory,
     });
-
-    // Validate parent category existence
-    const parentCategory = await categoryModel.findById(categoryId);
-    if (!parentCategory) {
-      return apiResponse(res, 404, false, "Parent category not found");
-    }
 
     // Validate SKU parameters
     if (skuParameters && typeof skuParameters !== "object") {
