@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from "mongoose";
+import mongoose, { Document } from "mongoose";
 
 // Category interface
 export interface ICategory extends Document {
@@ -8,7 +8,7 @@ export interface ICategory extends Document {
   parentCategoryId?: mongoose.Types.ObjectId | null; // Nullable for top-level categories
   status: boolean;
   slug: string;
-  skuParameters?: Record<string, string[]>; // Map of SKU parameters
+  skuParameters: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -43,9 +43,8 @@ const categorySchema = new mongoose.Schema<ICategory>(
       unique: true,
     },
     skuParameters: {
-      type: Map,
-      of: [String],
-      default: {}, // Initialize as an empty object
+      type: [String], // Array of strings
+      default: [], // Initialize as an empty array
     },
   },
   { timestamps: true }

@@ -274,9 +274,9 @@ const createSubCategory = async (req: Request, res: Response) => {
     }
 
     // Validate SKU parameters
-    if (skuParameters && typeof skuParameters !== "object") {
-      return apiResponse(res, 400, false, "Invalid SKU parameters format");
-    }
+    // if (skuParameters && typeof skuParameters !== "array") {
+    //   return apiResponse(res, 400, false, "Invalid SKU parameters format");
+    // }
 
     // Create subcategory and link it to the parent
     const newSubCategory = new categoryModel({
