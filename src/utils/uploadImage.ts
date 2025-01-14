@@ -21,18 +21,19 @@ const upload = multer({
       cb(null, uniqueFileName); // File name in S3 bucket
     },
   }),
-  // fileFilter: (req, file, cb) => {
-  //   if (
-  //     file.mimetype === "image/jpeg" ||
-  //     file.mimetype === "image/png" ||
-  //     file.mimetype === "image/jpg"
-  //   ) {
-  //     cb(null, true);
-  //   } else {
-  //     cb(new Error("Invalid file type. Only JPG, JPEG, and PNG are allowed."));
-  //   }
-  // },
+  fileFilter: (req, file, cb) => {
+    if (
+      file.mimetype === "image/jpeg" ||
+      file.mimetype === "image/png" ||
+      file.mimetype === "image/jpg"
+    ) {
+      cb(null, true);
+    } else {
+      cb(new Error("Invalid file type. Only JPG, JPEG, and PNG are allowed."));
+    }
+  },
   limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB file size limit per file
 });
 
 export const uploadMultipleImages = upload.array("images", 5); // 5 images on each product
+export default upload;

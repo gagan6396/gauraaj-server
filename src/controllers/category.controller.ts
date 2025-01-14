@@ -11,12 +11,12 @@ const createCategory = async (req: Request, res: Response) => {
     const { name, description, image, parentCategoryId, imageUrls, imageUrl } =
       req.body;
 
-    console.log("imageUrl", imageUrl);
-    console.log("imageUrls", imageUrls);
+    console.log("imageUrl", req.file);
+    console.log("imageUrls", req.files);
 
     return apiResponse(res, 201, true, "Category created successfully", {
-      imageUrl: imageUrl,
-      imageUrls,
+      imageUrl: req.file,
+      imageUrls: req.files,
     });
 
     if (!name || !description) {

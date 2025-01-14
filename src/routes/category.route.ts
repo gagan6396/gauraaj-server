@@ -13,12 +13,12 @@ import {
   updateCategory,
   updateSubCategory,
 } from "../controllers/category.controller";
-import handleImageUpload from "../middlewares/imageMiddleware";
+import upload from "../utils/uploadImage";
 
 const categoryRoute = Router();
 
 // Define here category routes
-categoryRoute.post("/", handleImageUpload, createCategory);
+categoryRoute.post("/", upload.single("image"), createCategory);
 
 categoryRoute.get("/", getAllCategory);
 categoryRoute.get("/:categoryId", fetchCategoryById);
