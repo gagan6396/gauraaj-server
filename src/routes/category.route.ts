@@ -26,6 +26,7 @@ categoryRoute.delete("/:categoryId", deleteCategory);
 
 // Subcategory Creation
 categoryRoute.post("/:categoryId/subcategory", createSubCategory);
+
 categoryRoute.get(
   "/:categoryId/subcategory/:subCategoryId",
   fetchSubCategoryById

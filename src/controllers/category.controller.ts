@@ -267,6 +267,17 @@ const createSubCategory = async (req: Request, res: Response) => {
     // Generate slug if not provided
     let slug = req.body.slug || slugify(name, { lower: true });
 
+    console.log({ name, description, image, skuParameters, categoryId, slug });
+
+    return apiResponse(res, 201, true, "Subcategory created successfully", {
+      name,
+      description,
+      image,
+      skuParameters,
+      categoryId,
+      slug,
+    });
+
     // Validate parent category existence
     const parentCategory = await categoryModel.findById(categoryId);
     if (!parentCategory) {
@@ -445,7 +456,16 @@ export const getSubcategorySkuParameters = async (
 };
 
 export {
-  createCategory, createSubCategory, deleteCategory, deleteSubCategory,
-  fetchCategoryById, fetchProductBySubCategory, fetchSubCategoryById, getAllCategory, subCategoryFetching, updateCategory, updateSubCategory
+  createCategory,
+  createSubCategory,
+  deleteCategory,
+  deleteSubCategory,
+  fetchCategoryById,
+  fetchProductBySubCategory,
+  fetchSubCategoryById,
+  getAllCategory,
+  subCategoryFetching,
+  updateCategory,
+  updateSubCategory
 };
 
