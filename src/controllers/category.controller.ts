@@ -8,16 +8,7 @@ import apiResponse from "../utils/ApiResponse";
 // Create the category
 const createCategory = async (req: Request, res: Response) => {
   try {
-    const { name, description, image, parentCategoryId, imageUrls, imageUrl } =
-      req.body;
-
-    console.log("imageUrl", req.file);
-    console.log("imageUrls", req.files);
-
-    return apiResponse(res, 201, true, "Category created successfully", {
-      imageUrl: req.file,
-      imageUrls: req.files,
-    });
+    const { name, description, image, parentCategoryId } = req.body;
 
     if (!name || !description) {
       return apiResponse(res, 400, false, "Name and description are required");
@@ -454,16 +445,7 @@ export const getSubcategorySkuParameters = async (
 };
 
 export {
-  createCategory,
-  createSubCategory,
-  deleteCategory,
-  deleteSubCategory,
-  fetchCategoryById,
-  fetchProductBySubCategory,
-  fetchSubCategoryById,
-  getAllCategory,
-  subCategoryFetching,
-  updateCategory,
-  updateSubCategory
+  createCategory, createSubCategory, deleteCategory, deleteSubCategory,
+  fetchCategoryById, fetchProductBySubCategory, fetchSubCategoryById, getAllCategory, subCategoryFetching, updateCategory, updateSubCategory
 };
 
