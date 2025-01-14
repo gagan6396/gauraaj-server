@@ -36,4 +36,3 @@ const upload = multer({
 });
 
 export const uploadMultipleImages = upload.array("images", 5); // 5 images on each product
-export default upload;
