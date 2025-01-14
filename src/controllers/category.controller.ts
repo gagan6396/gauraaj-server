@@ -267,8 +267,6 @@ const createSubCategory = async (req: Request, res: Response) => {
     // Generate slug if not provided
     let slug = req.body.slug || slugify(name, { lower: true });
 
-    console.log({ name, description, image, skuParameters, categoryId, slug });
-
     // Validate parent category existence
     const parentCategory = await categoryModel.findById(categoryId);
     if (!parentCategory) {
@@ -279,16 +277,6 @@ const createSubCategory = async (req: Request, res: Response) => {
     if (skuParameters && typeof skuParameters !== "object") {
       return apiResponse(res, 400, false, "Invalid SKU parameters format");
     }
-
-    return apiResponse(res, 201, true, "Subcategory created successfully", {
-      name,
-      description,
-      image,
-      skuParameters,
-      categoryId,
-      slug,
-      parentCategory,
-    });
 
     // Create subcategory and link it to the parent
     const newSubCategory = new categoryModel({
@@ -309,9 +297,9 @@ const createSubCategory = async (req: Request, res: Response) => {
       "Subcategory created successfully",
       newSubCategory
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error creating subcategory:", error);
-    return apiResponse(res, 500, false, "Internal server error");
+    return apiResponse(res, 500, false, error);
   }
 };
 
