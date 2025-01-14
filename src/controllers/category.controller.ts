@@ -1,14 +1,18 @@
-import apiResponse from "../utils/ApiResponse";
-import categoryModel, { ICategory } from "../models/Category.model";
 import { Request, Response } from "express";
 import mongoose from "mongoose";
 import slugify from "slugify";
+import categoryModel, { ICategory } from "../models/Category.model";
 import productModel from "../models/Product.model";
+import apiResponse from "../utils/ApiResponse";
 
 // Create the category
 const createCategory = async (req: Request, res: Response) => {
   try {
-    const { name, description, image, parentCategoryId } = req.body;
+    const { name, description, image, parentCategoryId, imageUrls, imageUrl } =
+      req.body;
+
+    console.log("imageUrl", imageUrl);
+    console.log("imageUrls", imageUrls);
 
     if (!name || !description) {
       return apiResponse(res, 400, false, "Name and description are required");
@@ -446,14 +450,15 @@ export const getSubcategorySkuParameters = async (
 
 export {
   createCategory,
-  subCategoryFetching,
-  getAllCategory,
-  updateCategory,
-  deleteCategory,
   createSubCategory,
-  updateSubCategory,
+  deleteCategory,
   deleteSubCategory,
   fetchCategoryById,
-  fetchSubCategoryById,
   fetchProductBySubCategory,
+  fetchSubCategoryById,
+  getAllCategory,
+  subCategoryFetching,
+  updateCategory,
+  updateSubCategory
 };
+
