@@ -1,23 +1,12 @@
-import express, { Router } from "express";
+import { Router } from "express";
 import {
-  createOrder,
-  getOrderById,
   cancelOrder,
-  returnOrder,
+  createOrder,
   exchangeOrder,
-<<<<<<< HEAD
-=======
+  getOrderById,
+  returnOrder,
   trackOrder,
->>>>>>> ravichandra/main
 } from "../controllers/order.controller";
-import validateRequest from "../middlewares/validateSchema";
-import {
-  createOrderSchema,
-  getOrderSchema,
-  cancelOrderSchema,
-  returnOrderSchema,
-  exchangeOrderSchema,
-} from "../Schema/order.schema";
 
 const orderRoute = Router();
 
@@ -28,11 +17,7 @@ orderRoute.get(
   // validateRequest({ params: getOrderSchema, body: getOrderSchema }),
   getOrderById
 );
-<<<<<<< HEAD
-orderRoute.put(
-=======
 orderRoute.post(
->>>>>>> ravichandra/main
   "/:orderId/cancel",
   // validateRequest({ params: cancelOrderSchema, body: cancelOrderSchema }),
   cancelOrder
@@ -48,9 +33,6 @@ orderRoute.post(
   exchangeOrder
 );
 
-<<<<<<< HEAD
-=======
 orderRoute.get("/track/:orderId", trackOrder);
 
->>>>>>> ravichandra/main
 export default orderRoute;

@@ -1,19 +1,15 @@
-import userModel from "../models/User.model";
-import profileModel from "../models/Profile.model";
-import apiResponse from "../utils/ApiResponse";
-import { Response, Request } from "express";
-import wishlistModel from "../models/WishList";
+import { Request, Response } from "express";
 import mongoose from "mongoose";
-import orderModel from "../models/Order.model";
+import { redisClient } from "../config/redisClient";
+import historyModel from "../models/History.model";
 import LoyaltyPointModel from "../models/LoyaltyPoint.model";
 import NotificationModel from "../models/Notification.model";
-import { triggerAsyncId } from "async_hooks";
-import historyModel from "../models/History.model";
-import { redisClient } from "../config/redisClient";
+import orderModel from "../models/Order.model";
+import profileModel from "../models/Profile.model";
+import userModel from "../models/User.model";
+import wishlistModel from "../models/WishList";
+import apiResponse from "../utils/ApiResponse";
 
-<<<<<<< HEAD
-// User Profile Routes
-=======
 
 // User Profile Routes
 // const getUserProfile = async (req: Request, res: Response) => {
@@ -68,7 +64,6 @@ import { redisClient } from "../config/redisClient";
 //   }
 // };
 
->>>>>>> ravichandra/main
 const getUserProfile = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
@@ -85,10 +80,7 @@ const getUserProfile = async (req: Request, res: Response) => {
 
     // Check if the user profile is cached
     const cacheKey = `user:profile:${userId}`;
-<<<<<<< HEAD
-=======
     console.log("fetchign profile for cacheKey", cacheKey);
->>>>>>> ravichandra/main
     const cachedProfile = await redisClient.get(cacheKey);
     if (cachedProfile) {
       console.log("Serving user profile from cache");
@@ -247,12 +239,7 @@ const updateUserProfile = async (req: Request, res: Response) => {
   }
 };
 
-<<<<<<< HEAD
-// User Profile Wishlist Fetch Api's
-
-=======
 // User Profile Wishlist Fetch Api'
->>>>>>> ravichandra/main
 const FetchUserWishlist = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
@@ -343,10 +330,6 @@ const addProductToWishlist = async (req: Request, res: Response) => {
   }
 };
 
-<<<<<<< HEAD
-// update user's wishlist
-=======
->>>>>>> ravichandra/main
 const updateUserWishlist = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
@@ -642,15 +625,6 @@ const FetchUserNotification = async (req: Request, res: Response) => {
 };
 
 export {
-  getUserProfile,
-  updateUserProfile,
-  FetchUserWishlist,
-  addProductToWishlist,
-  updateUserWishlist,
-  deleteProductFromWishlist,
-  getUserOrders,
-  getUserLoyaltiPoints,
-  RedeeemLoyaltiPoints,
-  FetchUserNotification,
-  getUserOrderHistory,
+  addProductToWishlist, deleteProductFromWishlist, FetchUserNotification, FetchUserWishlist, getUserLoyaltiPoints, getUserOrderHistory, getUserOrders, getUserProfile, RedeeemLoyaltiPoints, updateUserProfile, updateUserWishlist
 };
+

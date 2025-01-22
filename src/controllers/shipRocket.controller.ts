@@ -1,15 +1,9 @@
-import { Request, Response, NextFunction } from "express";
+import { NextFunction, Request, Response } from "express";
+import orderModel from "../models/Order.model";
 import {
   createShipRocketOrder,
-<<<<<<< HEAD
-  // cancelShipRocketOrder,
-=======
-  cancelShipRocketOrder,
->>>>>>> ravichandra/main
-  returnShipRocketOrder,
+  returnShipRocketOrder
 } from "../services/shipRocket.service";
-import apiResponse from "../utils/ApiResponse";
-import orderModel from "../models/Order.model";
 
 // Create order
 export const createOrder = async (
@@ -77,11 +71,7 @@ export const createOrder = async (
 //     }
 
 //     // Cancel the order via ShipRocket
-<<<<<<< HEAD
-//     const result = await cancelShipRocketOrder(orderId);
-=======
 //     const result = await cancelShipRocketOrder(orderId,);
->>>>>>> ravichandra/main
 
 //     return apiResponse(res, 200, true, "Order cancelled successfully", result);
 //   } catch (error: any) {

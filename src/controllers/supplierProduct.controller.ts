@@ -1,17 +1,11 @@
-import productModel from "../models/Product.model";
-import supplierModel from "../models/Supplier.model";
-import { Response, Request } from "express";
-import apiResponse from "../utils/ApiResponse";
+import { Request, Response } from "express";
 import mongoose from "mongoose";
 import categoryModel from "../models/Category.model";
+import productModel from "../models/Product.model";
+import supplierModel from "../models/Supplier.model";
+import apiResponse from "../utils/ApiResponse";
 
 // Supplier Product Management
-<<<<<<< HEAD
-
-const addProductBySupplier = async (req: Request, res: Response) => {
-  try {
-    const { supplierId } = req.params;
-=======
 const addProductBySupplier = async (req: Request, res: Response) => {
   try {
     const { supplierId } = req.params;
@@ -21,7 +15,6 @@ const addProductBySupplier = async (req: Request, res: Response) => {
       return apiResponse(res, 400, false, "Invalid or missing 'data' field");
     }
 
->>>>>>> ravichandra/main
     const {
       name,
       description,
@@ -29,22 +22,11 @@ const addProductBySupplier = async (req: Request, res: Response) => {
       stock,
       category_id,
       subcategory_id,
-<<<<<<< HEAD
-      imageUrls,
-      colors,
-      sizes,
-=======
       skuParameters,
->>>>>>> ravichandra/main
       brand,
       weight,
       dimensions,
       sku,
-<<<<<<< HEAD
-    } = req.body;
-
-    // Validate supplierId
-=======
     } = JSON.parse(req.body.data);
 
     // Ensure image URLs are added from the upload middleware
@@ -57,7 +39,6 @@ const addProductBySupplier = async (req: Request, res: Response) => {
 
     console.log(imageUrls);
 
->>>>>>> ravichandra/main
     if (!mongoose.isValidObjectId(supplierId)) {
       return apiResponse(res, 400, false, "Invalid supplier ID format");
     }
@@ -69,22 +50,12 @@ const addProductBySupplier = async (req: Request, res: Response) => {
       !price ||
       !stock ||
       !category_id ||
-<<<<<<< HEAD
-      !imageUrls ||
-      !colors ||
-      !sizes ||
-      !brand ||
-      !weight ||
-      !dimensions ||
-      !sku
-=======
       !skuParameters ||
       !brand ||
       !weight ||
       !dimensions ||
       !sku ||
       !imageUrls.length
->>>>>>> ravichandra/main
     ) {
       return apiResponse(
         res,
@@ -94,70 +65,6 @@ const addProductBySupplier = async (req: Request, res: Response) => {
       );
     }
 
-<<<<<<< HEAD
-    // Validate colors and sizes as arrays
-    if (!Array.isArray(colors) || !Array.isArray(sizes)) {
-      return apiResponse(res, 400, false, "Colors and Sizes must be arrays");
-    }
-
-    // Validate each color object
-    if (
-      colors.some(
-        (color: any) =>
-          !color.name ||
-          typeof color.name !== "string" ||
-          !color.stock ||
-          typeof color.stock !== "number"
-      )
-    ) {
-      return apiResponse(res, 400, false, "Invalid color format");
-    }
-
-    // Validate each size object
-    if (
-      sizes.some(
-        (size: any) =>
-          !size.name ||
-          typeof size.name !== "string" ||
-          !size.stock ||
-          typeof size.stock !== "number"
-      )
-    ) {
-      return apiResponse(
-        res,
-        400,
-        false,
-        "Each size must have a 'name' (string) and 'stock' (number)"
-      );
-    }
-
-    // Validate weight
-    if (typeof weight !== "number" || weight <= 0) {
-      return apiResponse(res, 400, false, "Invalid weight value");
-    }
-
-    // Validate dimensions
-    if (
-      !dimensions.height ||
-      !dimensions.length ||
-      !dimensions.width ||
-      typeof dimensions.height !== "number" ||
-      typeof dimensions.length !== "number" ||
-      typeof dimensions.width !== "number" ||
-      dimensions.height <= 0 ||
-      dimensions.length <= 0 ||
-      dimensions.width <= 0
-    ) {
-      return apiResponse(
-        res,
-        400,
-        false,
-        "Dimensions must include valid height, length, and width (positive numbers)"
-      );
-    }
-
-    // Validate SKU uniqueness
-=======
     // Validate SKU parameters
     if (
       !Object.keys(skuParameters).length ||
@@ -167,17 +74,12 @@ const addProductBySupplier = async (req: Request, res: Response) => {
     }
 
     // Check if SKU already exists
->>>>>>> ravichandra/main
     const skuExists = await productModel.findOne({ sku });
     if (skuExists) {
       return apiResponse(res, 400, false, "SKU must be unique");
     }
 
-<<<<<<< HEAD
-    // Check supplier existence and approval status
-=======
     // Validate supplier existence and approval status
->>>>>>> ravichandra/main
     const supplier = await supplierModel.findById(supplierId);
     if (!supplier) {
       return apiResponse(res, 404, false, "Supplier not found");
@@ -194,20 +96,12 @@ const addProductBySupplier = async (req: Request, res: Response) => {
     }
 
     // Validate subcategory existence (if provided)
-<<<<<<< HEAD
-    let subCategory = null;
-=======
->>>>>>> ravichandra/main
     if (subcategory_id) {
       if (!mongoose.isValidObjectId(subcategory_id)) {
         return apiResponse(res, 400, false, "Invalid subcategory ID");
       }
 
-<<<<<<< HEAD
-      subCategory = await categoryModel.findOne({
-=======
       const subCategory = await categoryModel.findOne({
->>>>>>> ravichandra/main
         _id: subcategory_id,
         parentCategoryId: category_id,
       });
@@ -235,11 +129,7 @@ const addProductBySupplier = async (req: Request, res: Response) => {
       return apiResponse(res, 400, false, "Product already exists");
     }
 
-<<<<<<< HEAD
-    // Create a new product
-=======
     // Create a new product with the uploaded images
->>>>>>> ravichandra/main
     const newProduct = new productModel({
       supplier_id: supplierId,
       category_id,
@@ -248,18 +138,10 @@ const addProductBySupplier = async (req: Request, res: Response) => {
       description,
       price: mongoose.Types.Decimal128.fromString(price.toString()),
       stock,
-<<<<<<< HEAD
-      images: Array.isArray(imageUrls) ? imageUrls : [imageUrls],
-      reviews: [],
-      rating: 0,
-      color: colors,
-      size: sizes,
-=======
       images: imageUrls, // Store the uploaded image URLs here
       reviews: [],
       rating: 0,
       skuParameters,
->>>>>>> ravichandra/main
       brand,
       weight,
       dimensions,
@@ -407,8 +289,6 @@ const deleteProductBySupplier = async (req: Request, res: Response) => {
 const addBulkProductsBySupplier = async (req: Request, res: Response) => {};
 
 export {
-  addProductBySupplier,
-  updateProductBySupplier,
-  getAllSupplierProducts,
-  deleteProductBySupplier,
+  addProductBySupplier, deleteProductBySupplier, getAllSupplierProducts, updateProductBySupplier
 };
+

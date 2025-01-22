@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from "mongoose";
+import mongoose, { Document, Schema } from "mongoose";
 
 export interface Product extends Document {
   supplier_id: mongoose.Types.ObjectId;
@@ -11,17 +11,6 @@ export interface Product extends Document {
   stock: number;
   images: string[];
   rating: number;
-<<<<<<< HEAD
-  color: {
-    name: string;
-    stock: number;
-  }[];
-  size: {
-    name: string;
-    stock: number;
-  }[];
-=======
->>>>>>> ravichandra/main
   brand: string;
   weight: number; // Weight in kilograms
   dimensions: {
@@ -30,10 +19,7 @@ export interface Product extends Document {
     width: number; // Width in cm
   };
   sku: string; // Stock Keeping Unit
-<<<<<<< HEAD
-=======
   skuParameters?: Record<string, string[]>; // Dynamic SKU parameters
->>>>>>> ravichandra/main
 }
 
 const productSchema: Schema<Product> = new mongoose.Schema(
@@ -93,35 +79,6 @@ const productSchema: Schema<Product> = new mongoose.Schema(
       min: [0, "Rating cannot be less than 0."],
       max: [5, "Rating cannot be greater than 5."],
     },
-<<<<<<< HEAD
-    color: [
-      {
-        name: {
-          type: String,
-          required: true,
-        },
-        stock: {
-          type: Number,
-          required: true,
-          min: [0, "Stock cannot be negative."],
-        },
-      },
-    ],
-    size: [
-      {
-        name: {
-          type: String,
-          required: true,
-        },
-        stock: {
-          type: Number,
-          required: true,
-          min: [0, "Stock cannot be negative."],
-        },
-      },
-    ],
-=======
->>>>>>> ravichandra/main
     brand: {
       type: String,
       required: true,
@@ -155,14 +112,11 @@ const productSchema: Schema<Product> = new mongoose.Schema(
       unique: true,
       trim: true,
     },
-<<<<<<< HEAD
-=======
     skuParameters: {
       type: Map,
       of: [String],
       default: {},
     },
->>>>>>> ravichandra/main
   },
   {
     timestamps: true,

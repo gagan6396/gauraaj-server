@@ -1,22 +1,16 @@
-import orderModel from "../models/Order.model";
 import { Request, Response } from "express";
-import apiResponse from "../utils/ApiResponse";
-import productModel from "../models/Product.model";
-import PaymentModel from "../models/Payment.model";
 import mongoose from "mongoose";
+import orderModel from "../models/Order.model";
+import productModel from "../models/Product.model";
 import ShippingModel from "../models/Shipping.model";
-import { addProductBySupplier } from "./supplierProduct.controller";
 import {
-  createShipRocketOrder,
   cancelShipRocketOrder,
-<<<<<<< HEAD
-=======
-  shipRocketTrackOrder,
+  createShipRocketOrder,
   getOrderDetailsFromShipRocket,
   shipRocketReturnOrder,
->>>>>>> ravichandra/main
+  shipRocketTrackOrder,
 } from "../services/shipRocket.service";
-import { sendMessageToKafka } from "../config/kafkaConfig";
+import apiResponse from "../utils/ApiResponse";
 
 // const createOrder = async (req: Request, res: Response) => {
 //   try {
@@ -419,151 +413,6 @@ const cancelOrder = async (req: Request, res: Response) => {
   }
 };
 
-<<<<<<< HEAD
-const returnOrder = async (req: Request, res: Response) => {
-  try {
-    const { orderId } = req.params;
-    const {
-      userId,
-      reason,
-      products,
-    }: {
-      userId: string;
-      reason: string;
-      products: { productId: string; quantity: number }[];
-    } = req.body;
-
-    if (!mongoose.Types.ObjectId.isValid(orderId)) {
-      return apiResponse(res, 400, false, "Invalid order ID.");
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return apiResponse(res, 400, false, "Invalid user ID.");
-    }
-
-    if (!reason || !products || products.length === 0) {
-      return apiResponse(
-        res,
-        400,
-        false,
-        "Please provide a reason and products."
-      );
-    }
-
-    const order = await orderModel.findById(orderId);
-    if (!order) {
-      return apiResponse(res, 404, false, "Order not found.");
-    }
-
-    // Ensure order belongs to the user_id
-    if (order.user_id.toString() !== userId) {
-      return apiResponse(
-        res,
-        403,
-        false,
-        "Access Denied: Order does not belong to user."
-      );
-    }
-
-    // Order status should not be cancelled
-    if (order.orderStatus === "Cancelled") {
-      return apiResponse(res, 403, false, "Order is already cancelled.");
-    }
-
-    if (order.orderStatus !== "Delivered") {
-      return apiResponse(
-        res,
-        403,
-        false,
-        "Only delivered orders can be returned."
-      );
-    }
-
-    // Validate products in the request
-    const invalidProducts: string[] = [];
-    for (const item of products) {
-      const { productId, quantity } = item;
-      const orderProduct = order.products.find(
-        (p: { productId: mongoose.Types.ObjectId; quantity: number }) =>
-          p.productId.toString() === productId && p.quantity >= quantity
-      );
-
-      if (!orderProduct) {
-        invalidProducts.push(productId);
-      }
-    }
-
-    if (invalidProducts.length > 0) {
-      return apiResponse(
-        res,
-        400,
-        false,
-        `Invalid products or quantities in the request: ${invalidProducts.join(
-          ", "
-        )}`
-      );
-    }
-
-    // Process the return
-    for (const { productId, quantity } of products) {
-      const productDetails = await productModel.findById(productId);
-      if (!productDetails) {
-        continue; // Skip if the product is not found
-      }
-
-      // Update the stock for returned products
-      productDetails.stock += quantity;
-      await productDetails.save();
-    }
-
-    // Update the order status and products
-    order.orderStatus = "Return Requested";
-    order.products = order.products.map((p: any) => {
-      const matchingProduct = products.find(
-        (prod) => prod.productId === p.productId.toString()
-      );
-      if (matchingProduct) {
-        return {
-          ...p,
-          returnRequested: true,
-          reason,
-        };
-      }
-      return p;
-    });
-
-    const updatedOrder = await order.save();
-
-    // Update the shipping status to "Returned"
-    const shipping = await ShippingModel.findOne({ orderId: orderId });
-
-    if (shipping) {
-      shipping.shippingStatus = "Returned";
-      await shipping.save();
-    } else {
-      console.log("No shipping record found for this order.");
-    }
-
-    return apiResponse(
-      res,
-      200,
-      true,
-      "Order return requested successfully, and shipping status updated.",
-      updatedOrder
-    );
-  } catch (error) {
-    console.error("Error while processing return request", error);
-    return apiResponse(
-      res,
-      500,
-      false,
-      "Error while processing return request."
-    );
-  }
-};
-
-=======
->>>>>>> ravichandra/main
 const exchangeOrder = async (req: Request, res: Response) => {
   try {
     const { orderId } = req.params;
@@ -697,9 +546,6 @@ const exchangeOrder = async (req: Request, res: Response) => {
   }
 };
 
-<<<<<<< HEAD
-export { createOrder, getOrderById, cancelOrder, returnOrder, exchangeOrder };
-=======
 const trackOrder = async (req: Request, res: Response) => {
   try {
     const { orderId } = req.params;
@@ -943,11 +789,6 @@ const returnOrder = async (req: Request, res: Response) => {
 };
 
 export {
-  createOrder,
-  getOrderById,
-  cancelOrder,
-  returnOrder,
-  exchangeOrder,
-  trackOrder,
+  cancelOrder, createOrder, exchangeOrder, getOrderById, returnOrder, trackOrder
 };
->>>>>>> ravichandra/main
+

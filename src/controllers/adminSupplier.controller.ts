@@ -1,8 +1,7 @@
-import { Request, Response, RequestHandler } from "express";
-import userModel from "../models/User.model";
+import { Request, Response } from "express";
 import supplierModel from "../models/Supplier.model";
+import userModel from "../models/User.model";
 import apiResponse from "../utils/ApiResponse";
-import { triggerAsyncId } from "async_hooks";
 
 const updateSupplierById = async (req: Request, res: Response) => {
   try {
@@ -38,19 +37,6 @@ const updateSupplierById = async (req: Request, res: Response) => {
 
 const deleteSupplierById = async (req: Request, res: Response) => {
   try {
-<<<<<<< HEAD
-    const { userId } = req.params;
-
-    if (!userId) {
-      return apiResponse(res, 400, false, "User ID is required");
-    }
-
-    const deletedUser = await userModel.findByIdAndDelete(userId);
-
-    if (!deletedUser) {
-      return apiResponse(res, 404, false, "User not found");
-    }
-=======
     // const { userId } = req.params;
 
     // if (!userId) {
@@ -69,7 +55,6 @@ const deleteSupplierById = async (req: Request, res: Response) => {
     if (!deletedSupplier) {
       return apiResponse(res, 404, false, "Supplier not found");
     };
->>>>>>> ravichandra/main
 
     return apiResponse(res, 200, true, "User deleted successfully");
   } catch (error) {
@@ -144,9 +129,6 @@ const rejectSupplier = async (req: Request, res: Response) => {
 };
 
 export {
-  getAllSuppliers,
-  updateSupplierById,
-  deleteSupplierById,
-  approveSupplier,
-  rejectSupplier,
+  approveSupplier, deleteSupplierById, getAllSuppliers, rejectSupplier, updateSupplierById
 };
+

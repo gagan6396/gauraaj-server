@@ -1,18 +1,11 @@
 import { Router } from "express";
 import {
   addProductBySupplier,
-  updateProductBySupplier,
-  getAllSupplierProducts,
   deleteProductBySupplier,
+  getAllSupplierProducts,
+  updateProductBySupplier,
 } from "../controllers/supplierProduct.controller";
 import handleImageUpload from "../middlewares/imageMiddleware";
-import validateRequest from "../middlewares/validateSchema";
-import {
-  supplierIdParamsSchema,
-  supplierAddProductSchema,
-  supplierUpdateProductSchema,
-  getAllSupplierProductsSchema,
-} from "../Schema/supplierProduct.schema";
 
 const supplierProductRoute = Router();
 
@@ -20,13 +13,6 @@ const supplierProductRoute = Router();
 supplierProductRoute.post(
   "/:supplierId",
   handleImageUpload,
-<<<<<<< HEAD
-  // validateRequest({
-  //   params: supplierIdParamsSchema,
-  //   body: supplierAddProductSchema,
-  // }),
-=======
->>>>>>> ravichandra/main
   addProductBySupplier
 );
 supplierProductRoute.patch(
