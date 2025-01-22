@@ -1,5 +1,5 @@
 import apiResponse from "../utils/ApiResponse";
-import categoryModel from "../models/Category.model";
+import categoryModel, { ICategory } from "../models/Category.model";
 import { Request, Response } from "express";
 import mongoose from "mongoose";
 import slugify from "slugify";
@@ -8,39 +8,63 @@ import productModel from "../models/Product.model";
 // Create the category
 const createCategory = async (req: Request, res: Response) => {
   try {
-    const { name, description, image, parentCategoryId } = req.body;
+    const { name, description, parentCategoryId } = JSON.parse(req.body.data);
+    const images = req.body.imageUrls || [];
 
+    // Validate required fields
     if (!name || !description) {
-      return apiResponse(res, 400, false, "Name and description are required");
+      return apiResponse(res, 400, false, "Name and description are required.");
     }
 
-    let slug = req.body.slug;
-    if (!slug) {
-      slug = slugify(name, { lower: true });
+    // Validate images
+    if (images.length === 0) {
+      return apiResponse(res, 400, false, "At least one image is required.");
     }
+    if (images.length > 5) {
+      return apiResponse(
+        res,
+        400,
+        false,
+        "A category can have up to 5 images."
+      );
+    }
+
+    const slug = slugify(name, { lower: true });
 
     const newCategory = new categoryModel({
       name,
       description,
       slug,
-      image,
+      images,
       parentCategoryId,
     });
 
+    // Save the category
     await newCategory.save();
 
-    return apiResponse(
-      res,
-      201,
-      true,
-      "Category created successfully",
-      newCategory
-    );
-  } catch (error) {
+    return apiResponse(res, 201, true, "Category created successfully", {
+      ...newCategory.toObject(),
+    });
+  } catch (error: any) {
     console.error("Error creating category:", error);
+
+    // Handle duplicate key error
+    if (error.code === 11000) {
+      const duplicateField = Object.keys(error.keyValue)[0];
+      const duplicateValue = error.keyValue[duplicateField];
+      return apiResponse(
+        res,
+        400,
+        false,
+        `Category with ${duplicateField} "${duplicateValue}" already exists.`
+      );
+    }
+
+    // Handle other errors
     return apiResponse(res, 500, false, "Internal server error");
   }
 };
+
 // Get all category
 
 const getAllCategory = async (req: Request, res: Response) => {
@@ -209,47 +233,130 @@ const subCategoryFetching = async (req: Request, res: Response) => {
   }
 };
 
+// const createSubCategory = async (req: Request, res: Response) => {
+//   try {
+//     const { categoryId } = req.params; // Parent category ID (e.g., Electronics)
+//     const { name, description, image } = req.body;
+
+//     // Check if required fields are provided
+//     if (!name || !description) {
+//       return apiResponse(res, 400, false, "Name and description are required");
+//     }
+
+//     let slug = req.body.slug;
+//     if (!slug) {
+//       slug = slugify(name, { lower: true });
+//     }
+
+//     // Check if parent category exists
+//     const parentCategory = await categoryModel.findById(categoryId);
+//     if (!parentCategory) {
+//       return apiResponse(res, 404, false, "Parent category not found");
+//     }
+
+//     // Create new subcategory and link to the parent category
+//     const newSubCategory = new categoryModel({
+//       name,
+//       description,
+//       slug,
+//       image,
+//       parentCategoryId: categoryId, // Link to the parent category
+//     });
+
+//     await newSubCategory.save();
+
+//     return apiResponse(
+//       res,
+//       201,
+//       true,
+//       "Subcategory created successfully",
+//       newSubCategory
+//     );
+//   } catch (error) {
+//     console.error("Error creating subcategory:", error);
+//     return apiResponse(res, 500, false, "Internal server error");
+//   }
+// };
+
+//
+
+// SubCategory with Sku Parameters
+
 const createSubCategory = async (req: Request, res: Response) => {
   try {
-    const { categoryId } = req.params; // Parent category ID (e.g., Electronics)
-    const { name, description, image } = req.body;
+    // Parse the incoming data
+    const { name, description, imageUrls, skuParameters } = JSON.parse(
+      req.body.data
+    );
 
-    // Check if required fields are provided
+    // Ensure `images` are properly handled from the request
+    const images = req.body.imageUrls || imageUrls || [];
+
+    // Validate required fields
     if (!name || !description) {
       return apiResponse(res, 400, false, "Name and description are required");
     }
 
-    let slug = req.body.slug;
-    if (!slug) {
-      slug = slugify(name, { lower: true });
+    // Validate images: Ensure at least one image is provided and limit to 5 images
+    if (!Array.isArray(images) || images.length === 0) {
+      return apiResponse(res, 400, false, "At least one image is required.");
+    }
+    if (images.length > 5) {
+      return apiResponse(
+        res,
+        400,
+        false,
+        "A subcategory can have up to 5 images."
+      );
     }
 
-    // Check if parent category exists
+    // Generate a slug if not provided
+    const slug = req.body.slug || slugify(name, { lower: true });
+
+    // Validate the parent category
+    const { categoryId } = req.params;
     const parentCategory = await categoryModel.findById(categoryId);
     if (!parentCategory) {
       return apiResponse(res, 404, false, "Parent category not found");
     }
 
-    // Create new subcategory and link to the parent category
+    // Validate SKU parameters
+    if (skuParameters && !Array.isArray(skuParameters)) {
+      return apiResponse(res, 400, false, "SKU parameters must be an array");
+    }
+
+    // Create and save the new subcategory
     const newSubCategory = new categoryModel({
       name,
       description,
       slug,
-      image,
-      parentCategoryId: categoryId, // Link to the parent category
+      images, // Save the validated image URLs
+      parentCategoryId: categoryId,
+      skuParameters: skuParameters || parentCategory.skuParameters, // Inherit from parent if not provided
     });
 
     await newSubCategory.save();
 
-    return apiResponse(
-      res,
-      201,
-      true,
-      "Subcategory created successfully",
-      newSubCategory
-    );
-  } catch (error) {
+    // Respond with the newly created subcategory, including images
+    return apiResponse(res, 201, true, "Subcategory created successfully", {
+      ...newSubCategory.toObject(),
+    });
+  } catch (error: any) {
     console.error("Error creating subcategory:", error);
+
+    // Handle duplicate key error
+    if (error.code === 11000) {
+      const duplicateField = Object.keys(error.keyValue)[0];
+      const duplicateValue = error.keyValue[duplicateField];
+      return apiResponse(
+        res,
+        400,
+        false,
+        `Subcategory with ${duplicateField} "${duplicateValue}" already exists`
+      );
+    }
+
+    // Handle other errors
     return apiResponse(res, 500, false, "Internal server error");
   }
 };
@@ -353,6 +460,46 @@ const fetchProductBySubCategory = async (req: Request, res: Response) => {
   }
 
   return apiResponse(res, 200, true, "Products fetched successfully", products);
+};
+
+export const getSubcategorySkuParameters = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { categoryId, subCategoryId } = req.params;
+
+    console.log("Category ID:", categoryId); // Log categoryId
+    console.log("Subcategory ID:", subCategoryId); // Log subcategoryId
+
+    // Fetch the subcategory based on the subcategoryId and parentCategoryId
+    const subcategory = await categoryModel
+      .findOne({ _id: subCategoryId, parentCategoryId: categoryId })
+      .lean<ICategory>();
+
+    // Log the result to debug
+    console.log("Fetched subcategory:", subcategory);
+
+    // Check if subcategory exists and belongs to the specified categoryId
+    if (!subcategory) {
+      return apiResponse(
+        res,
+        404,
+        false,
+        "Subcategory not found under this category"
+      );
+    }
+
+    // Retrieve SKU parameters from the subcategory (if any)
+    const skuParameters = subcategory.skuParameters || [];
+
+    return apiResponse(res, 200, true, "SKU parameters fetched successfully", {
+      skuParameters,
+    });
+  } catch (error) {
+    console.error("Error fetching SKU parameters:", error);
+    return apiResponse(res, 500, false, "Internal server error");
+  }
 };
 
 export {

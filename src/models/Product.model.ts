@@ -11,14 +11,6 @@ export interface Product extends Document {
   stock: number;
   images: string[];
   rating: number;
-  color: {
-    name: string;
-    stock: number;
-  }[];
-  size: {
-    name: string;
-    stock: number;
-  }[];
   brand: string;
   weight: number; // Weight in kilograms
   dimensions: {
@@ -27,6 +19,7 @@ export interface Product extends Document {
     width: number; // Width in cm
   };
   sku: string; // Stock Keeping Unit
+  skuParameters?: Record<string, string[]>; // Dynamic SKU parameters
 }
 
 const productSchema: Schema<Product> = new mongoose.Schema(
@@ -86,32 +79,6 @@ const productSchema: Schema<Product> = new mongoose.Schema(
       min: [0, "Rating cannot be less than 0."],
       max: [5, "Rating cannot be greater than 5."],
     },
-    color: [
-      {
-        name: {
-          type: String,
-          required: true,
-        },
-        stock: {
-          type: Number,
-          required: true,
-          min: [0, "Stock cannot be negative."],
-        },
-      },
-    ],
-    size: [
-      {
-        name: {
-          type: String,
-          required: true,
-        },
-        stock: {
-          type: Number,
-          required: true,
-          min: [0, "Stock cannot be negative."],
-        },
-      },
-    ],
     brand: {
       type: String,
       required: true,
@@ -144,6 +111,11 @@ const productSchema: Schema<Product> = new mongoose.Schema(
       required: true,
       unique: true,
       trim: true,
+    },
+    skuParameters: {
+      type: Map,
+      of: [String],
+      default: {},
     },
   },
   {

@@ -4,15 +4,16 @@ import mongoose, { Schema, Document } from "mongoose";
 export interface ICategory extends Document {
   name: string;
   description: string;
-  image?: string;
-  parentCategoryId?: mongoose.Types.ObjectId;
+  images?: string[]; // Updated to allow multiple images
+  parentCategoryId?: mongoose.Types.ObjectId | null; // Nullable for top-level categories
   status: boolean;
   slug: string;
+  skuParameters?: string[];
   createdAt: Date;
   updatedAt: Date;
 }
 
-// Category Schema
+// Updated Category Schema
 const categorySchema = new mongoose.Schema<ICategory>(
   {
     name: {
@@ -24,8 +25,13 @@ const categorySchema = new mongoose.Schema<ICategory>(
       type: String,
       required: true,
     },
-    image: {
-      type: String,
+    images: {
+      type: [String], // Array of strings for multiple image URLs
+      validate: {
+        validator: (v: string[]) => v.length <= 5, // Limit to 5 images
+        message: "A category can have up to 5 images.",
+      },
+      required: true, // Ensure at least one image is provided
     },
     parentCategoryId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -41,11 +47,14 @@ const categorySchema = new mongoose.Schema<ICategory>(
       required: true,
       unique: true,
     },
+    skuParameters: {
+      type: [String], 
+      default: [], 
+    },
   },
   { timestamps: true }
 );
 
-// Category Model
 const categoryModel =
   mongoose.models.Category ||
   mongoose.model<ICategory>("Category", categorySchema);

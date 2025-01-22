@@ -4,11 +4,23 @@ export interface Order extends Document {
   user_id: mongoose.Types.ObjectId;
   orderDate: Date;
   totalAmount: number;
-  orderStatus: "Pending" | "Shipped" | "Delivered" | "Cancelled";
+  orderStatus:
+    | "Pending"
+    | "Shipped"
+    | "Delivered"
+    | "Cancelled"
+    | "Return Requested";
+  shippingStatus:
+    | "Pending"
+    | "Shipped"
+    | "Delivered"
+    | "Cancelled"
+    | "Returned"; 
   products: {
     productId: mongoose.Types.ObjectId;
     quantity: number;
   }[];
+  shipRocketOrderId?: number;
   shippingAddressId: mongoose.Types.ObjectId;
   payment_id: mongoose.Types.ObjectId;
 }
@@ -32,7 +44,18 @@ const OrderSchema: Schema<Order> = new Schema(
     },
     orderStatus: {
       type: String,
-      enum: ["Pending", "Shipped", "Delivered", "Cancelled"],
+      enum: [
+        "Pending",
+        "Shipped",
+        "Delivered",
+        "Cancelled",
+        "Return Requested",
+      ],
+      default: "Pending",
+    },
+    shippingStatus: {
+      type: String,
+      enum: ["Pending", "Shipped", "Delivered", "Cancelled", "Returned"], // Added `Returned`
       default: "Pending",
     },
     products: [
@@ -49,6 +72,10 @@ const OrderSchema: Schema<Order> = new Schema(
         },
       },
     ],
+    shipRocketOrderId: {
+      type: Number,
+      required: false,
+    },
     shippingAddressId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Profile",

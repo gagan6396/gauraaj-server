@@ -6,10 +6,15 @@ import mongoose from "mongoose";
 import categoryModel from "../models/Category.model";
 
 // Supplier Product Management
-
 const addProductBySupplier = async (req: Request, res: Response) => {
   try {
     const { supplierId } = req.params;
+
+    // Validate JSON and parse it
+    if (!req.body.data || typeof req.body.data !== "string") {
+      return apiResponse(res, 400, false, "Invalid or missing 'data' field");
+    }
+
     const {
       name,
       description,
@@ -17,16 +22,23 @@ const addProductBySupplier = async (req: Request, res: Response) => {
       stock,
       category_id,
       subcategory_id,
-      imageUrls,
-      colors,
-      sizes,
+      skuParameters,
       brand,
       weight,
       dimensions,
       sku,
-    } = req.body;
+    } = JSON.parse(req.body.data);
 
-    // Validate supplierId
+    // Ensure image URLs are added from the upload middleware
+    let imageUrls: string[] = [];
+    if (req.body.imageUrls && Array.isArray(req.body.imageUrls)) {
+      imageUrls = req.body.imageUrls;
+    } else if (req.body.imageUrl) {
+      imageUrls = [req.body.imageUrl];
+    }
+
+    console.log(imageUrls);
+
     if (!mongoose.isValidObjectId(supplierId)) {
       return apiResponse(res, 400, false, "Invalid supplier ID format");
     }
@@ -38,13 +50,12 @@ const addProductBySupplier = async (req: Request, res: Response) => {
       !price ||
       !stock ||
       !category_id ||
-      !imageUrls ||
-      !colors ||
-      !sizes ||
+      !skuParameters ||
       !brand ||
       !weight ||
       !dimensions ||
-      !sku
+      !sku ||
+      !imageUrls.length
     ) {
       return apiResponse(
         res,
@@ -54,74 +65,21 @@ const addProductBySupplier = async (req: Request, res: Response) => {
       );
     }
 
-    // Validate colors and sizes as arrays
-    if (!Array.isArray(colors) || !Array.isArray(sizes)) {
-      return apiResponse(res, 400, false, "Colors and Sizes must be arrays");
-    }
-
-    // Validate each color object
+    // Validate SKU parameters
     if (
-      colors.some(
-        (color: any) =>
-          !color.name ||
-          typeof color.name !== "string" ||
-          !color.stock ||
-          typeof color.stock !== "number"
-      )
+      !Object.keys(skuParameters).length ||
+      Object.values(skuParameters).some((param: any) => !Array.isArray(param))
     ) {
-      return apiResponse(res, 400, false, "Invalid color format");
+      return apiResponse(res, 400, false, "Invalid SKU parameters format");
     }
 
-    // Validate each size object
-    if (
-      sizes.some(
-        (size: any) =>
-          !size.name ||
-          typeof size.name !== "string" ||
-          !size.stock ||
-          typeof size.stock !== "number"
-      )
-    ) {
-      return apiResponse(
-        res,
-        400,
-        false,
-        "Each size must have a 'name' (string) and 'stock' (number)"
-      );
-    }
-
-    // Validate weight
-    if (typeof weight !== "number" || weight <= 0) {
-      return apiResponse(res, 400, false, "Invalid weight value");
-    }
-
-    // Validate dimensions
-    if (
-      !dimensions.height ||
-      !dimensions.length ||
-      !dimensions.width ||
-      typeof dimensions.height !== "number" ||
-      typeof dimensions.length !== "number" ||
-      typeof dimensions.width !== "number" ||
-      dimensions.height <= 0 ||
-      dimensions.length <= 0 ||
-      dimensions.width <= 0
-    ) {
-      return apiResponse(
-        res,
-        400,
-        false,
-        "Dimensions must include valid height, length, and width (positive numbers)"
-      );
-    }
-
-    // Validate SKU uniqueness
+    // Check if SKU already exists
     const skuExists = await productModel.findOne({ sku });
     if (skuExists) {
       return apiResponse(res, 400, false, "SKU must be unique");
     }
 
-    // Check supplier existence and approval status
+    // Validate supplier existence and approval status
     const supplier = await supplierModel.findById(supplierId);
     if (!supplier) {
       return apiResponse(res, 404, false, "Supplier not found");
@@ -138,13 +96,12 @@ const addProductBySupplier = async (req: Request, res: Response) => {
     }
 
     // Validate subcategory existence (if provided)
-    let subCategory = null;
     if (subcategory_id) {
       if (!mongoose.isValidObjectId(subcategory_id)) {
         return apiResponse(res, 400, false, "Invalid subcategory ID");
       }
 
-      subCategory = await categoryModel.findOne({
+      const subCategory = await categoryModel.findOne({
         _id: subcategory_id,
         parentCategoryId: category_id,
       });
@@ -172,7 +129,7 @@ const addProductBySupplier = async (req: Request, res: Response) => {
       return apiResponse(res, 400, false, "Product already exists");
     }
 
-    // Create a new product
+    // Create a new product with the uploaded images
     const newProduct = new productModel({
       supplier_id: supplierId,
       category_id,
@@ -181,11 +138,10 @@ const addProductBySupplier = async (req: Request, res: Response) => {
       description,
       price: mongoose.Types.Decimal128.fromString(price.toString()),
       stock,
-      images: Array.isArray(imageUrls) ? imageUrls : [imageUrls],
+      images: imageUrls, // Store the uploaded image URLs here
       reviews: [],
       rating: 0,
-      color: colors,
-      size: sizes,
+      skuParameters,
       brand,
       weight,
       dimensions,

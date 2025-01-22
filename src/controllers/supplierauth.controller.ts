@@ -26,12 +26,6 @@ const registerSupplier = async (req: Request, res: Response) => {
       return apiResponse(res, 400, false, "All fields are required.");
     }
 
-    // Check if supplier email already exists
-    const existingSupplier = await supplierModel.findOne({ email });
-    if (existingSupplier) {
-      return apiResponse(res, 400, false, "Email is already registered.");
-    }
-
     // Hash the password
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
@@ -46,37 +40,58 @@ const registerSupplier = async (req: Request, res: Response) => {
       approval_status: "Pending",
     });
 
-    const savedSupplier = await newSupplier.save();
+    // Attempt to save the new supplier
+    try {
+      const savedSupplier = await newSupplier.save();
 
-    const admins = await adminModel.find();
-    if (admins.length > 0) {
-      const adminEmails = admins.map((admin) => admin.email);
+      // Send email to admins for approval if admins exist
+      const admins = await adminModel.find();
+      if (admins.length > 0) {
+        const adminEmails = admins.map((admin) => admin.email);
 
-      // Send email to admins for approval
-      const emailSubject = "New Supplier Registration Approval Request";
-      const emailHtml = `
-        <p>A new supplier has registered on the platform:</p>
-        <ul>
-          <li><strong>Username:</strong> ${username}</li>
-          <li><strong>Email:</strong> ${email}</li>
-          <li><strong>Shop Name:</strong> ${shop_name}</li>
-          <li><strong>Phone:</strong> ${phone}</li>
-        </ul>
-        <p>Please review and approve the supplier in the admin panel.</p>
-      `;
-      await sendEmailToAdmins(adminEmails, emailSubject, emailHtml);
-    }
-
-    return apiResponse(
-      res,
-      201,
-      true,
-      "Registration successful. Approval request sent to admins.",
-      {
-        supplier_id: newSupplier._id,
-        savedSupplier,
+        // Send email to admins for approval with supplierId included
+        const emailSubject = "New Supplier Registration Approval Request";
+        const emailHtml = `
+          <p>A new supplier has registered on the platform:</p>
+          <ul>
+            <li><strong>Supplier ID:</strong> ${savedSupplier._id}</li>
+            <li><strong>Username:</strong> ${username}</li>
+            <li><strong>Email:</strong> ${email}</li>
+            <li><strong>Shop Name:</strong> ${shop_name}</li>
+            <li><strong>Phone:</strong> ${phone}</li>
+          </ul>
+          <p>Please review and approve the supplier in the admin panel.</p>
+        `;
+        await sendEmailToAdmins(adminEmails, emailSubject, emailHtml);
       }
-    );
+
+      return apiResponse(
+        res,
+        201,
+        true,
+        "Registration successful. Approval request sent to admins.",
+        {
+          supplier_id: newSupplier._id,
+          savedSupplier,
+        }
+      );
+    } catch (error: any) {
+      // Handle duplicate key error for email
+      if (error.code === 11000) {
+        const duplicateField = Object.keys(error.keyValue)[0];
+        const duplicateValue = error.keyValue[duplicateField];
+        return apiResponse(
+          res,
+          400,
+          false,
+          `Supplier with ${duplicateField} "${duplicateValue}" already exists`
+        );
+      }
+
+      // Handle other errors
+      console.error("Error during supplier registration:", error);
+      return apiResponse(res, 500, false, "Internal server error.");
+    }
   } catch (error) {
     console.error("Error during supplier registration:", error);
     return apiResponse(res, 500, false, "Internal server error.");

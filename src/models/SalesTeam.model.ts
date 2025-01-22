@@ -2,7 +2,6 @@ import mongoose, { Schema, Document } from "mongoose";
 
 // Interface defining the SalesTeam document structure
 export interface SalesTeam extends Document {
-  userId: mongoose.Types.ObjectId;
   name: string;
   email: string;
   phone: string;
@@ -34,11 +33,6 @@ interface PerformanceMetrics {
 // Mongoose schema for SalesTeam
 const salesSchema: Schema<SalesTeam> = new Schema(
   {
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
     name: {
       type: String,
       required: true,

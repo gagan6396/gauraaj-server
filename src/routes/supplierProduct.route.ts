@@ -20,10 +20,6 @@ const supplierProductRoute = Router();
 supplierProductRoute.post(
   "/:supplierId",
   handleImageUpload,
-  // validateRequest({
-  //   params: supplierIdParamsSchema,
-  //   body: supplierAddProductSchema,
-  // }),
   addProductBySupplier
 );
 supplierProductRoute.patch(

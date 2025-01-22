@@ -11,6 +11,7 @@ import {
   fetchCategoryById,
   fetchSubCategoryById,
   fetchProductBySubCategory,
+  getSubcategorySkuParameters,
 } from "../controllers/category.controller";
 import {
   createCategorySchema,
@@ -24,11 +25,12 @@ import {
   fetchProductBySubCategorySchema,
 } from "../Schema/category.schema";
 import validateRequest from "../middlewares/validateSchema";
+import handleImageUpload from "../middlewares/imageMiddleware";
 
 const categoryRoute = Router();
 
 // Define here category routes
-categoryRoute.post("/", createCategory);
+categoryRoute.post("/", handleImageUpload, createCategory);
 categoryRoute.get("/", getAllCategory);
 categoryRoute.get("/:categoryId", fetchCategoryById);
 categoryRoute.get("/:categoryId/subcategory", subCategoryFetching);
@@ -36,7 +38,11 @@ categoryRoute.put("/:categoryId", updateCategory);
 categoryRoute.delete("/:categoryId", deleteCategory);
 
 // Subcategory Creation
-categoryRoute.post("/:categoryId/subcategory", createSubCategory);
+categoryRoute.post(
+  "/:categoryId/subcategory",
+  handleImageUpload,
+  createSubCategory
+);
 categoryRoute.get(
   "/:categoryId/subcategory/:subCategoryId",
   fetchSubCategoryById
@@ -49,5 +55,11 @@ categoryRoute.delete(
 
 // SubCategory Product
 categoryRoute.get("/subcategory/:subCategoryId", fetchProductBySubCategory);
+
+// GetSubcategoryParameters
+categoryRoute.get(
+  "/:categoryId/subcategory/:subCategoryId/parameters",
+  getSubcategorySkuParameters
+);
 
 export default categoryRoute;

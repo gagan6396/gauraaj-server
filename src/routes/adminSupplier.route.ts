@@ -20,7 +20,7 @@ const adminSupplierRoute = Router();
 
 adminSupplierRoute.get("/", adminAuthMiddleware, getAllSuppliers);
 adminSupplierRoute.delete(
-  "/:userId",
+  "/:supplierId",
   adminAuthMiddleware,
   // validateRequest({ params: deleteSupplierSchema }),
   deleteSupplierById

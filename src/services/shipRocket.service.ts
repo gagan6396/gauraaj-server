@@ -1,9 +1,36 @@
 import { Request } from "express";
 import axios from "axios";
-import mongoose from "mongoose";
+import mongoose, { Number } from "mongoose";
 import orderModel from "../models/Order.model";
 import shipRocketConfig from "../config/shipRocketConfig";
 import { producer, sendMessageToKafka } from "../config/kafkaConfig";
+import productModel from "../models/Product.model";
+
+// interface ShipRocketOrderRequest {
+//   orderId: string;
+//   products: {
+//     productId: string;
+//     quantity: number;
+//     selling_price?: number;
+//     name?: string;
+//     sku?: string;
+//     discount?: number;
+//     tax?: number;
+//   }[];
+//   addressSnapshot: {
+//     addressLine1: string;
+//     city: string;
+//     state?: string;
+//     country?: string;
+//     postalCode: string;
+//   };
+//   dimensions: {
+//     length?: number;
+//     width?: number;
+//     height?: number;
+//     weight?: number;
+//   };
+// }
 
 interface ShipRocketOrderRequest {
   orderId: string;
@@ -15,6 +42,12 @@ interface ShipRocketOrderRequest {
     sku?: string;
     discount?: number;
     tax?: number;
+    dimensions: {
+      length: number;
+      width: number;
+      height: number;
+      weight: number;
+    };
   }[];
   addressSnapshot: {
     addressLine1: string;
@@ -22,12 +55,6 @@ interface ShipRocketOrderRequest {
     state?: string;
     country?: string;
     postalCode: string;
-  };
-  dimensions: {
-    length?: number;
-    width?: number;
-    height?: number;
-    weight?: number;
   };
 }
 
@@ -78,11 +105,11 @@ const createShipRocketOrder = async (
   orderData: ShipRocketOrderRequest
 ): Promise<any> => {
   try {
-    const { orderId, products, addressSnapshot, dimensions } = orderData;
+    const { orderId, products, addressSnapshot } = orderData;
 
     console.log("Creating order for", orderId);
 
-    if (!orderId || !products || !addressSnapshot || !dimensions) {
+    if (!orderId || !products || !addressSnapshot) {
       throw new Error("Required fields are missing in the request.");
     }
 
@@ -90,7 +117,6 @@ const createShipRocketOrder = async (
       throw new Error(`Invalid order ID: ${orderId}`);
     }
 
-    // Convert the string orderId to ObjectId using 'new'
     const order = await orderModel
       .findById(new mongoose.Types.ObjectId(orderId)) // Instantiate ObjectId with 'new'
       .populate("user_id", "first_name last_name email phone");
@@ -103,19 +129,53 @@ const createShipRocketOrder = async (
       throw new Error("No valid products provided for the order.");
     }
 
-    // Calculate the subtotal of the order based on the products
-    const sub_total = products.reduce(
-      (total, product) =>
-        total + product.quantity * (product.selling_price || 0),
-      0
+    // Initialize total order dimensions and subtotal
+    let totalDimensions = { length: 0, width: 0, height: 0, weight: 0 };
+    let sub_total = 0;
+
+    // Loop through products to ensure correct price formatting and dimension handling
+    const updatedProducts = await Promise.all(
+      products.map(async (product) => {
+        const productDetails = await productModel.findById(product.productId);
+        if (!productDetails) {
+          throw new Error(`Product with ID ${product.productId} not found.`);
+        }
+
+        // Ensure the selling price is an integer (but we will not round it off)
+        const sellingPrice = parseFloat(
+          product.selling_price?.toString() || "0"
+        );
+
+        // Extract product dimensions and weight
+        const productDimensions = productDetails.dimensions || {};
+        totalDimensions.length += productDimensions.length || 0;
+        totalDimensions.width += productDimensions.width || 0;
+        totalDimensions.height += productDimensions.height || 0;
+        totalDimensions.weight +=
+          (productDetails.weight || 0) * product.quantity;
+
+        sub_total += product.quantity * sellingPrice;
+
+        return {
+          productId: product.productId.toString(),
+          quantity: product.quantity,
+          selling_price: sellingPrice, // Ensure this is kept as it is, no rounding
+          name: productDetails.name,
+          sku: productDetails.sku,
+          discount: product.discount || 0,
+          tax: product.tax || 0,
+          dimensions: productDimensions, // Ensure dimensions are included here
+        };
+      })
     );
 
+    // Pass the sub_total as is, without rounding
     // Prepare the request body for the ShipRocket API
     const requestBody = {
       order_id: order._id.toString(),
       order_date: new Date().toISOString(),
       payment_method: "Prepaid",
-      sub_total: sub_total,
+      sub_total,
       shipping_is_billing: true,
       billing_customer_name: order.user_id.first_name,
       billing_last_name: order.user_id.last_name || "",
@@ -125,7 +185,7 @@ const createShipRocketOrder = async (
       billing_country: addressSnapshot.country || "India",
       billing_phone: order.user_id.phone || "1234567890",
       billing_pincode: addressSnapshot.postalCode,
-      order_items: products.map((product) => ({
+      order_items: updatedProducts.map((product) => ({
         name: product.name || "Default Product Name",
         sku: product.sku || "DEFAULT-SKU",
         units: product.quantity,
@@ -133,10 +193,10 @@ const createShipRocketOrder = async (
         discount: product.discount || 0,
         tax: product.tax || 0,
       })),
-      length: dimensions.length || 10,
-      breadth: dimensions.width || 5,
-      height: dimensions.height || 8,
-      weight: dimensions.weight || 2,
+      length: totalDimensions.length || 10,
+      breadth: totalDimensions.width || 5,
+      height: totalDimensions.height || 8,
+      weight: totalDimensions.weight || 2,
     };
 
     // Get ShipRocket Token and send the request to ShipRocket API
@@ -178,7 +238,10 @@ const createShipRocketOrder = async (
   }
 };
 
-const cancelShipRocketOrder = async (orderId: string): Promise<any> => {
+const cancelShipRocketOrder = async (
+  orderId: string,
+  shipRocketOrderId: number
+): Promise<any> => {
   try {
     const token = await getShipRocketToken();
     if (!token) {
@@ -186,7 +249,7 @@ const cancelShipRocketOrder = async (orderId: string): Promise<any> => {
     }
 
     const payload = {
-      ids: [orderId],
+      ids: [shipRocketOrderId], // ShipRocket expects an array of order IDs
     };
 
     console.log("Payload sent to ShipRocket API:", payload);
@@ -204,7 +267,7 @@ const cancelShipRocketOrder = async (orderId: string): Promise<any> => {
 
     console.log("ShipRocket Response:", response.data);
 
-    // Send message to Kafka (success case)
+    // Send success message to Kafka
     await sendMessageToKafka("shiprocket.orders", {
       event: "order_canceled",
       orderId: orderId,
@@ -294,4 +357,91 @@ const returnShipRocketOrder = async (
   }
 };
 
-export { createShipRocketOrder, cancelShipRocketOrder, returnShipRocketOrder };
+const shipRocketTrackOrder = async (shipmentId: number): Promise<any> => {
+  try {
+    // Get the token from shipRocket
+    const token = await getShipRocketToken();
+
+    if (!token) {
+      throw new Error("Failed to recive authorization token");
+    }
+
+    const response = await axios.get(
+      `${shipRocketConfig.baseUrl}/v1/external/courier/track/shipment/${shipmentId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error("Error Tracking shipment in ShipRocket", error);
+    throw new Error(`Failed to track shipment: ${error}`);
+  }
+};
+
+export const getOrderDetailsFromShipRocket = async (
+  shipRocketOrderId: number
+): Promise<any | null> => {
+  try {
+    const url = `https://apiv2.shiprocket.in/v1/external/orders/show/${shipRocketOrderId}`;
+    const token = await getShipRocketToken();
+
+    // Make the GET request to ShipRocket API
+    const response = await axios.get(url, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    // Check if the response contains order details
+    if (response?.data) {
+      return response.data;
+    }
+
+    // Return null if no order details are found
+    return null;
+  } catch (error: any) {
+    console.error(
+      "Error fetching order details from ShipRocket:",
+      error?.message || error
+    );
+    return null;
+  }
+};
+
+const shipRocketReturnOrder = async (payload: any) => {
+  try {
+    const token = await getShipRocketToken();
+    if (!token) {
+      throw new Error("No ShipRocket token found");
+    }
+
+    const response = await axios.post(
+      "https://apiv2.shiprocket.in/v1/external/orders/create/return",
+      payload,
+      {
+        headers: {
+          "content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error("ShipRocket: Unable to return order", error);
+    throw new Error("Failed to create return order on shipRocket");
+  }
+};
+
+export {
+  createShipRocketOrder,
+  cancelShipRocketOrder,
+  returnShipRocketOrder,
+  shipRocketTrackOrder,
+  shipRocketReturnOrder
+};
