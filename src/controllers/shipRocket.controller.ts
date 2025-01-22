@@ -1,7 +1,11 @@
 import { Request, Response, NextFunction } from "express";
 import {
   createShipRocketOrder,
+<<<<<<< HEAD
   // cancelShipRocketOrder,
+=======
+  cancelShipRocketOrder,
+>>>>>>> ravichandra/main
   returnShipRocketOrder,
 } from "../services/shipRocket.service";
 import apiResponse from "../utils/ApiResponse";
@@ -73,7 +77,11 @@ export const createOrder = async (
 //     }
 
 //     // Cancel the order via ShipRocket
+<<<<<<< HEAD
 //     const result = await cancelShipRocketOrder(orderId);
+=======
+//     const result = await cancelShipRocketOrder(orderId,);
+>>>>>>> ravichandra/main
 
 //     return apiResponse(res, 200, true, "Order cancelled successfully", result);
 //   } catch (error: any) {

@@ -4,7 +4,22 @@ export interface Order extends Document {
   user_id: mongoose.Types.ObjectId;
   orderDate: Date;
   totalAmount: number;
+<<<<<<< HEAD
   orderStatus: "Pending" | "Shipped" | "Delivered" | "Cancelled";
+=======
+  orderStatus:
+    | "Pending"
+    | "Shipped"
+    | "Delivered"
+    | "Cancelled"
+    | "Return Requested";
+  shippingStatus:
+    | "Pending"
+    | "Shipped"
+    | "Delivered"
+    | "Cancelled"
+    | "Returned"; 
+>>>>>>> ravichandra/main
   products: {
     productId: mongoose.Types.ObjectId;
     quantity: number;
@@ -33,7 +48,22 @@ const OrderSchema: Schema<Order> = new Schema(
     },
     orderStatus: {
       type: String,
+<<<<<<< HEAD
       enum: ["Pending", "Shipped", "Delivered", "Cancelled"],
+=======
+      enum: [
+        "Pending",
+        "Shipped",
+        "Delivered",
+        "Cancelled",
+        "Return Requested",
+      ],
+      default: "Pending",
+    },
+    shippingStatus: {
+      type: String,
+      enum: ["Pending", "Shipped", "Delivered", "Cancelled", "Returned"], // Added `Returned`
+>>>>>>> ravichandra/main
       default: "Pending",
     },
     products: [

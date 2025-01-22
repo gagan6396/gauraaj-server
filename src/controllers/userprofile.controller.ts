@@ -11,7 +11,64 @@ import { triggerAsyncId } from "async_hooks";
 import historyModel from "../models/History.model";
 import { redisClient } from "../config/redisClient";
 
+<<<<<<< HEAD
 // User Profile Routes
+=======
+
+// User Profile Routes
+// const getUserProfile = async (req: Request, res: Response) => {
+//   try {
+//     const { userId } = req.params;
+
+//     if (!userId) {
+//       return apiResponse(res, 400, false, "Please provide a userId");
+//     }
+
+//     // Find user by userId
+//     const user = await userModel.findById(userId);
+//     if (!user) {
+//       return apiResponse(res, 404, false, "User not found");
+//     }
+
+//     // Fetch the profile using the user's ID
+//     const profileExist = await profileModel.findOne({ user_id: user._id });
+
+//     if (!profileExist) {
+//       return apiResponse(
+//         res,
+//         404,
+//         false,
+//         "Profile not found. Please create one."
+//       );
+//     }
+
+//     // Safely combine user and profile data
+//     const userProfile = {
+//       first_name: user.first_name,
+//       last_name: user.last_name,
+//       email: user.email,
+//       phone: user.phone,
+//       role: user.role,
+//       profileImage: profileExist.profileImage || "",
+//       shoppingAddress: profileExist.shoppingAddress || [],
+//       orderList: profileExist.orderList || [],
+//       wishList: profileExist.wishList || [],
+//     };
+
+//     return apiResponse(
+//       res,
+//       200,
+//       true,
+//       "User profile fetched successfully",
+//       userProfile
+//     );
+//   } catch (error) {
+//     console.error("Error while fetching user profile", error);
+//     return apiResponse(res, 500, false, "Internal server error");
+//   }
+// };
+
+>>>>>>> ravichandra/main
 const getUserProfile = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
@@ -28,6 +85,10 @@ const getUserProfile = async (req: Request, res: Response) => {
 
     // Check if the user profile is cached
     const cacheKey = `user:profile:${userId}`;
+<<<<<<< HEAD
+=======
+    console.log("fetchign profile for cacheKey", cacheKey);
+>>>>>>> ravichandra/main
     const cachedProfile = await redisClient.get(cacheKey);
     if (cachedProfile) {
       console.log("Serving user profile from cache");
@@ -186,8 +247,12 @@ const updateUserProfile = async (req: Request, res: Response) => {
   }
 };
 
+<<<<<<< HEAD
 // User Profile Wishlist Fetch Api's
 
+=======
+// User Profile Wishlist Fetch Api'
+>>>>>>> ravichandra/main
 const FetchUserWishlist = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
@@ -278,7 +343,10 @@ const addProductToWishlist = async (req: Request, res: Response) => {
   }
 };
 
+<<<<<<< HEAD
 // update user's wishlist
+=======
+>>>>>>> ravichandra/main
 const updateUserWishlist = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;

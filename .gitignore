@@ -65,3 +65,4 @@ temp/
 # Test and Coverage results
 coverage/
 .nyc_output/
+node_modules

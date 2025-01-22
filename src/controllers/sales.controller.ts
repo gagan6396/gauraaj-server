@@ -320,6 +320,11 @@ const getPerformanceMetrics = async (req: Request, res: Response) => {
     return apiResponse(res, 500, false, "Error fetching perofrmance metrics");
   }
 };
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> ravichandra/main
 export {
   registerSalesMember,
   loginSalesMember,

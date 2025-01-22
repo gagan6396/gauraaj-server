@@ -357,4 +357,95 @@ const returnShipRocketOrder = async (
   }
 };
 
+<<<<<<< HEAD
 export { createShipRocketOrder, cancelShipRocketOrder, returnShipRocketOrder };
+=======
+const shipRocketTrackOrder = async (shipmentId: number): Promise<any> => {
+  try {
+    // Get the token from shipRocket
+    const token = await getShipRocketToken();
+
+    if (!token) {
+      throw new Error("Failed to recive authorization token");
+    }
+
+    const response = await axios.get(
+      `${shipRocketConfig.baseUrl}/v1/external/courier/track/shipment/${shipmentId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error("Error Tracking shipment in ShipRocket", error);
+    throw new Error(`Failed to track shipment: ${error}`);
+  }
+};
+
+export const getOrderDetailsFromShipRocket = async (
+  shipRocketOrderId: number
+): Promise<any | null> => {
+  try {
+    const url = `https://apiv2.shiprocket.in/v1/external/orders/show/${shipRocketOrderId}`;
+    const token = await getShipRocketToken();
+
+    // Make the GET request to ShipRocket API
+    const response = await axios.get(url, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    // Check if the response contains order details
+    if (response?.data) {
+      return response.data;
+    }
+
+    // Return null if no order details are found
+    return null;
+  } catch (error: any) {
+    console.error(
+      "Error fetching order details from ShipRocket:",
+      error?.message || error
+    );
+    return null;
+  }
+};
+
+const shipRocketReturnOrder = async (payload: any) => {
+  try {
+    const token = await getShipRocketToken();
+    if (!token) {
+      throw new Error("No ShipRocket token found");
+    }
+
+    const response = await axios.post(
+      "https://apiv2.shiprocket.in/v1/external/orders/create/return",
+      payload,
+      {
+        headers: {
+          "content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error("ShipRocket: Unable to return order", error);
+    throw new Error("Failed to create return order on shipRocket");
+  }
+};
+
+export {
+  createShipRocketOrder,
+  cancelShipRocketOrder,
+  returnShipRocketOrder,
+  shipRocketTrackOrder,
+  shipRocketReturnOrder
+};
+>>>>>>> ravichandra/main

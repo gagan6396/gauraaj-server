@@ -9,6 +9,12 @@ import { addProductBySupplier } from "./supplierProduct.controller";
 import {
   createShipRocketOrder,
   cancelShipRocketOrder,
+<<<<<<< HEAD
+=======
+  shipRocketTrackOrder,
+  getOrderDetailsFromShipRocket,
+  shipRocketReturnOrder,
+>>>>>>> ravichandra/main
 } from "../services/shipRocket.service";
 import { sendMessageToKafka } from "../config/kafkaConfig";
 
@@ -413,6 +419,7 @@ const cancelOrder = async (req: Request, res: Response) => {
   }
 };
 
+<<<<<<< HEAD
 const returnOrder = async (req: Request, res: Response) => {
   try {
     const { orderId } = req.params;
@@ -555,6 +562,8 @@ const returnOrder = async (req: Request, res: Response) => {
   }
 };
 
+=======
+>>>>>>> ravichandra/main
 const exchangeOrder = async (req: Request, res: Response) => {
   try {
     const { orderId } = req.params;
@@ -688,4 +697,257 @@ const exchangeOrder = async (req: Request, res: Response) => {
   }
 };
 
+<<<<<<< HEAD
 export { createOrder, getOrderById, cancelOrder, returnOrder, exchangeOrder };
+=======
+const trackOrder = async (req: Request, res: Response) => {
+  try {
+    const { orderId } = req.params;
+
+    if (!orderId) {
+      return apiResponse(res, 400, false, "Order ID is required.");
+    }
+
+    const order = await orderModel.findById(orderId);
+    if (!order) {
+      return apiResponse(res, 404, false, "Order not found.");
+    }
+
+    const shipRocketOrderId = order.shipRocketOrderId;
+    if (!shipRocketOrderId) {
+      return apiResponse(
+        res,
+        404,
+        false,
+        "ShipRocket Order ID not found for this order."
+      );
+    }
+
+    const orderDetails = await getOrderDetailsFromShipRocket(shipRocketOrderId);
+
+    if (!orderDetails) {
+      return apiResponse(
+        res,
+        404,
+        false,
+        "Unable to fetch order details from ShipRocket."
+      );
+    }
+
+    const shipmentId = orderDetails?.data?.shipments?.id;
+
+    if (!shipmentId) {
+      return apiResponse(
+        res,
+        404,
+        false,
+        "Shipment ID not found in ShipRocket order details."
+      );
+    }
+
+    const trackingDetails = await shipRocketTrackOrder(shipmentId);
+    if (trackingDetails) {
+      return apiResponse(
+        res,
+        200,
+        true,
+        "Order tracking details retrieved successfully.",
+        trackingDetails
+      );
+    }
+
+    return apiResponse(res, 404, false, "Order tracking details not found.");
+  } catch (error) {
+    console.error("Error tracking order:", error);
+    return apiResponse(res, 500, false, "Error tracking order.");
+  }
+};
+
+// TODO: Complete this Return Order Request
+const returnOrder = async (req: Request, res: Response) => {
+  try {
+    const { orderId } = req.params;
+    const {
+      userId,
+      reason,
+      products,
+    }: {
+      userId: string;
+      reason: string;
+      products: { productId: string; quantity: number }[];
+    } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return apiResponse(res, 400, false, "Invalid order ID.");
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return apiResponse(res, 400, false, "Invalid user ID.");
+    }
+
+    if (!reason || !products || products.length === 0) {
+      return apiResponse(
+        res,
+        400,
+        false,
+        "Please provide a reason and products."
+      );
+    }
+
+    // Fetch the order
+    const order = await orderModel.findById(orderId);
+    if (!order) {
+      return apiResponse(res, 404, false, "Order not found.");
+    }
+
+    if (order.user_id.toString() !== userId) {
+      return apiResponse(
+        res,
+        403,
+        false,
+        "Access Denied: Order does not belong to user."
+      );
+    }
+
+    if (order.orderStatus === "Cancelled") {
+      return apiResponse(res, 403, false, "Order is already cancelled.");
+    }
+
+    if (order.orderStatus !== "Delivered") {
+      return apiResponse(
+        res,
+        403,
+        false,
+        "Only delivered orders can be returned."
+      );
+    }
+
+    const invalidProducts: string[] = [];
+    for (const item of products) {
+      const { productId, quantity } = item;
+      const orderProduct = order.products.find(
+        (p: any) =>
+          p.productId.toString() === productId && p.quantity >= quantity
+      );
+
+      if (!orderProduct) {
+        invalidProducts.push(productId);
+      }
+    }
+
+    if (invalidProducts.length > 0) {
+      return apiResponse(
+        res,
+        400,
+        false,
+        `Invalid products or quantities in the request: ${invalidProducts.join(
+          ", "
+        )}`
+      );
+    }
+
+    for (const { productId, quantity } of products) {
+      const productDetails = await productModel.findById(productId);
+      if (productDetails) {
+        productDetails.stock += quantity;
+        await productDetails.save();
+      }
+    }
+
+    order.orderStatus = "Return Requested";
+    order.shippingStatus = "Returned";
+    order.products = order.products.map((p: any) => {
+      const matchingProduct = products.find(
+        (prod) => prod.productId === p.productId.toString()
+      );
+      if (matchingProduct) {
+        return {
+          ...p,
+          returnRequested: true,
+          reason,
+        };
+      }
+      return p;
+    });
+
+    const updatedOrder = await order.save();
+
+    // Update shipping status if applicable
+    const shipping = await ShippingModel.findOne({ orderId });
+    if (shipping) {
+      shipping.shippingStatus = "Returned";
+      await shipping.save();
+    }
+
+    // Fetch order details from ShipRocket
+    const shipRocketOrderId = order.shipRocketOrderId;
+    const details = await getOrderDetailsFromShipRocket(shipRocketOrderId);
+
+    if (!details) {
+      return apiResponse(
+        res,
+        400,
+        false,
+        "Error fetching details from ShipRocket."
+      );
+    }
+
+    const { data } = details;
+    const shipRocketPayload = {
+      order_id: order._id,
+      order_date: order.orderDate,
+      channel_id: data.channel_id,
+      pickup_customer_name: data.customer_name,
+      pickup_email: data.customer_email,
+      pickup_phone: data.customer_phone,
+      pickup_address: data.customer_address,
+      pickup_city: data.customer_city,
+      pickup_state: data.customer_state,
+      pickup_pincode: data.customer_pincode,
+      pickup_country: data.customer_country,
+      shipping_customer_name: data.customer_name,
+      shipping_email: data.customer_email,
+      shipping_phone: data.customer_phone,
+      shipping_address: data.customer_address,
+      shipping_city: data.customer_city,
+      shipping_state: data.customer_state,
+      shipping_pincode: data.customer_pincode,
+      shipping_country: data.customer_country,
+      order_items: products.map((p) => ({
+        name: p.productId,
+        sku: p.productId,
+        units: p.quantity,
+        selling_price: "1200", 
+      })),
+      payment_method: data.payment_method,
+      sub_total: data.total,
+      length: data.shipments.length,
+      breadth: data.shipments.breadth,
+      height: data.shipments.height,
+      weight: data.shipments.weight,
+    };
+
+    const shipRocketResponse = await shipRocketReturnOrder(shipRocketPayload);
+    if (!shipRocketResponse) {
+      return apiResponse(res, 400, false, "ShipRocket API response error.");
+    }
+
+    return apiResponse(res, 200, true, "Return Order Successfully", {
+      updatedOrder,
+      shipRocketResponse,
+    });
+  } catch (error) {
+    console.error("Error while Return Order", error);
+    return apiResponse(res, 500, false, "Error while Return Order");
+  }
+};
+
+export {
+  createOrder,
+  getOrderById,
+  cancelOrder,
+  returnOrder,
+  exchangeOrder,
+  trackOrder,
+};
+>>>>>>> ravichandra/main

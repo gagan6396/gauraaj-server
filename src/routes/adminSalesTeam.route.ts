@@ -1,4 +1,5 @@
 import { Router } from "express";
+<<<<<<< HEAD
 import {
   assignRoleToSalesMember,
   assignSalesTarget,
@@ -14,6 +15,29 @@ import {
 } from "../controllers/adminSalesTeam.controller";
 import adminAuthMiddleware from "../middlewares/adminMiddleware";
 import authMiddleware from "../middlewares/authMiddleware";
+=======
+import adminAuthMiddleware from "../middlewares/adminMiddleware";
+import {
+  getAllSalesTeamMember,
+  getSalesTeamMemberById,
+  updateSalesTeamMember,
+  deleteSalesTeamMember,
+  updateSalesPerformance,
+  assignSalesTarget,
+  getSalesTeamLeaderboard,
+  assignRoleToSalesMember,
+  assignTerritoryToSalesMember,
+  getTeamOverview,
+  updatedPerformanceMetrics,
+} from "../controllers/adminSalesTeam.controller";
+import authMiddleware from "../middlewares/authMiddleware";
+import validateRequest from "../middlewares/validateSchema";
+import {
+  updateSalesPerformanceSchema,
+  assignSalesTargetSchema,
+  adminSalesTeamValidationSchemas,
+} from "../Schema/adminSales.schema";
+>>>>>>> ravichandra/main
 import adminSupplierRoute from "./adminSupplier.route";
 
 const adminSalesTeamRoute = Router();

@@ -1,5 +1,10 @@
+<<<<<<< HEAD
 import bcrypt from "bcrypt";
 import mongoose, { Document, Schema } from "mongoose";
+=======
+import mongoose, { Schema, Document } from "mongoose";
+import bcrypt from "bcrypt";
+>>>>>>> ravichandra/main
 
 const password = process.env.ADMIN_PASSWORD;
 if (!password) {

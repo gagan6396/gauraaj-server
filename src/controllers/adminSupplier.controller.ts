@@ -38,6 +38,7 @@ const updateSupplierById = async (req: Request, res: Response) => {
 
 const deleteSupplierById = async (req: Request, res: Response) => {
   try {
+<<<<<<< HEAD
     const { userId } = req.params;
 
     if (!userId) {
@@ -49,6 +50,26 @@ const deleteSupplierById = async (req: Request, res: Response) => {
     if (!deletedUser) {
       return apiResponse(res, 404, false, "User not found");
     }
+=======
+    // const { userId } = req.params;
+
+    // if (!userId) {
+    //   return apiResponse(res, 400, false, "User ID is required");
+    // }
+
+    // const deletedUser = await userModel.findByIdAndDelete(userId);
+
+    // if (!deletedUser) {
+    //   return apiResponse(res, 404, false, "User not found");
+    // }
+
+    const { supplierId } = req.params;
+    const deletedSupplier = await supplierModel.findByIdAndDelete(supplierId);
+
+    if (!deletedSupplier) {
+      return apiResponse(res, 404, false, "Supplier not found");
+    };
+>>>>>>> ravichandra/main
 
     return apiResponse(res, 200, true, "User deleted successfully");
   } catch (error) {

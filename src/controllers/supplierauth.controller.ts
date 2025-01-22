@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import bcrypt from "bcrypt";
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken"; // Import JWT library
@@ -7,6 +8,17 @@ import apiResponse from "../utils/ApiResponse";
 import { sendOtpEmail } from "../utils/EmailHelper";
 import { sendEmailToAdmins } from "../utils/EmailSend";
 import { generateToken } from "../utils/jwtHelper";
+=======
+import supplierModel from "../models/Supplier.model";
+import { Response, Request } from "express";
+import apiResponse from "../utils/ApiResponse";
+import bcrypt from "bcrypt";
+import adminModel from "../models/Admin.model";
+import { sendEmailToAdmins } from "../utils/EmailSend";
+import { generateToken } from "../utils/jwtHelper";
+import { sendOtpEmail } from "../utils/EmailHelper";
+
+>>>>>>> ravichandra/main
 const saltRounds = 10;
 
 const registerSupplier = async (req: Request, res: Response) => {
@@ -26,6 +38,7 @@ const registerSupplier = async (req: Request, res: Response) => {
       return apiResponse(res, 400, false, "All fields are required.");
     }
 
+<<<<<<< HEAD
     // Check if supplier email already exists
     const existingSupplier = await supplierModel.findOne({ email });
     if (existingSupplier) {
@@ -36,6 +49,12 @@ const registerSupplier = async (req: Request, res: Response) => {
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
     // Create a new supplier with "pending" approval status (but no token yet)
+=======
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // Create a new supplier with "pending" approval status
+>>>>>>> ravichandra/main
     const newSupplier = new supplierModel({
       username,
       email,
@@ -46,6 +65,7 @@ const registerSupplier = async (req: Request, res: Response) => {
       approval_status: "Pending",
     });
 
+<<<<<<< HEAD
     // Save the supplier to the database
     const savedSupplier = await newSupplier.save();
 
@@ -89,6 +109,60 @@ const registerSupplier = async (req: Request, res: Response) => {
         token,
       }
     );
+=======
+    // Attempt to save the new supplier
+    try {
+      const savedSupplier = await newSupplier.save();
+
+      // Send email to admins for approval if admins exist
+      const admins = await adminModel.find();
+      if (admins.length > 0) {
+        const adminEmails = admins.map((admin) => admin.email);
+
+        // Send email to admins for approval with supplierId included
+        const emailSubject = "New Supplier Registration Approval Request";
+        const emailHtml = `
+          <p>A new supplier has registered on the platform:</p>
+          <ul>
+            <li><strong>Supplier ID:</strong> ${savedSupplier._id}</li>
+            <li><strong>Username:</strong> ${username}</li>
+            <li><strong>Email:</strong> ${email}</li>
+            <li><strong>Shop Name:</strong> ${shop_name}</li>
+            <li><strong>Phone:</strong> ${phone}</li>
+          </ul>
+          <p>Please review and approve the supplier in the admin panel.</p>
+        `;
+        await sendEmailToAdmins(adminEmails, emailSubject, emailHtml);
+      }
+
+      return apiResponse(
+        res,
+        201,
+        true,
+        "Registration successful. Approval request sent to admins.",
+        {
+          supplier_id: newSupplier._id,
+          savedSupplier,
+        }
+      );
+    } catch (error: any) {
+      // Handle duplicate key error for email
+      if (error.code === 11000) {
+        const duplicateField = Object.keys(error.keyValue)[0];
+        const duplicateValue = error.keyValue[duplicateField];
+        return apiResponse(
+          res,
+          400,
+          false,
+          `Supplier with ${duplicateField} "${duplicateValue}" already exists`
+        );
+      }
+
+      // Handle other errors
+      console.error("Error during supplier registration:", error);
+      return apiResponse(res, 500, false, "Internal server error.");
+    }
+>>>>>>> ravichandra/main
   } catch (error) {
     console.error("Error during supplier registration:", error);
     return apiResponse(res, 500, false, "Internal server error.");
@@ -98,12 +172,15 @@ const registerSupplier = async (req: Request, res: Response) => {
 const loginSupplier = async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
+<<<<<<< HEAD
     console.log(
       "Supplier login attempt with email:",
       email,
       "and password:",
       password
     );
+=======
+>>>>>>> ravichandra/main
 
     if (!email || !password) {
       return apiResponse(res, 400, false, "Email and password are required.");
@@ -114,7 +191,10 @@ const loginSupplier = async (req: Request, res: Response) => {
     if (!supplier) {
       return apiResponse(res, 404, false, "Supplier not found.");
     }
+<<<<<<< HEAD
     console.log("supplier", supplier);
+=======
+>>>>>>> ravichandra/main
 
     if (supplier.approval_status !== "Approved") {
       return apiResponse(
@@ -242,6 +322,7 @@ const supplierLogOut = async (req: Request, res: Response) => {
 };
 
 export {
+<<<<<<< HEAD
   loginSupplier,
   registerSupplier,
   supplierForgatPassword,
@@ -249,3 +330,11 @@ export {
   supplierResetPassword
 };
 
+=======
+  registerSupplier,
+  loginSupplier,
+  supplierForgatPassword,
+  supplierResetPassword,
+  supplierLogOut,
+};
+>>>>>>> ravichandra/main

@@ -5,6 +5,10 @@ import {
   cancelOrder,
   returnOrder,
   exchangeOrder,
+<<<<<<< HEAD
+=======
+  trackOrder,
+>>>>>>> ravichandra/main
 } from "../controllers/order.controller";
 import validateRequest from "../middlewares/validateSchema";
 import {
@@ -24,7 +28,11 @@ orderRoute.get(
   // validateRequest({ params: getOrderSchema, body: getOrderSchema }),
   getOrderById
 );
+<<<<<<< HEAD
 orderRoute.put(
+=======
+orderRoute.post(
+>>>>>>> ravichandra/main
   "/:orderId/cancel",
   // validateRequest({ params: cancelOrderSchema, body: cancelOrderSchema }),
   cancelOrder
@@ -40,4 +48,9 @@ orderRoute.post(
   exchangeOrder
 );
 
+<<<<<<< HEAD
+=======
+orderRoute.get("/track/:orderId", trackOrder);
+
+>>>>>>> ravichandra/main
 export default orderRoute;

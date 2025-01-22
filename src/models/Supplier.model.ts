@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import mongoose, { Document, Schema } from "mongoose";
+=======
+import mongoose, { Schema, Document } from "mongoose";
+>>>>>>> ravichandra/main
 
 export interface Supplier extends Document {
   username: string;
@@ -20,7 +24,10 @@ export interface Supplier extends Document {
   inventoryCount: number;
   totalSales: number;
   averageRating: number;
+<<<<<<< HEAD
   token: string;
+=======
+>>>>>>> ravichandra/main
   approval_status: "Pending" | "Approved" | "Rejected";
   totalOrders: number;
   passwordResetOTP: number;
@@ -80,9 +87,12 @@ const supplierSchema: Schema<Supplier> = new Schema(
     profileImage: {
       type: String,
     },
+<<<<<<< HEAD
     token: {
       type: String,
     },
+=======
+>>>>>>> ravichandra/main
     products: [
       {
         type: mongoose.Schema.Types.ObjectId,
