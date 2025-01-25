@@ -8,6 +8,7 @@ import {
   fetchProductBySubCategory,
   fetchSubCategoryById,
   getAllCategory,
+  getAllSubcategories,
   getSubcategorySkuParameters,
   subCategoryFetching,
   updateCategory,
@@ -22,7 +23,7 @@ categoryRoute.post("/", handleImageUpload, createCategory);
 categoryRoute.get("/", getAllCategory);
 categoryRoute.get("/:categoryId", fetchCategoryById);
 categoryRoute.get("/:categoryId/subcategory", subCategoryFetching);
-categoryRoute.put("/:categoryId", updateCategory);
+categoryRoute.put("/:categoryId", handleImageUpload, updateCategory);
 categoryRoute.delete("/:categoryId", deleteCategory);
 
 // Subcategory Creation
@@ -40,6 +41,7 @@ categoryRoute.put(
   handleImageUpload,
   updateSubCategory
 );
+
 categoryRoute.delete(
   "/:categoryId/subcategory/:subCategoryId",
   deleteSubCategory
@@ -53,5 +55,7 @@ categoryRoute.get(
   "/:categoryId/subcategory/:subCategoryId/parameters",
   getSubcategorySkuParameters
 );
+
+categoryRoute.get("/:categoryId/subcategories", getAllSubcategories);
 
 export default categoryRoute;

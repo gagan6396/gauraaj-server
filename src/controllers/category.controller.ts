@@ -115,21 +115,79 @@ const fetchCategoryById = async (req: Request, res: Response) => {
   }
 };
 
-// getSubCategories
+// const updateCategory = async (req: Request, res: Response) => {
+//   try {
+//     const { categoryId } = req.params;
+//     const updates = req.body;
 
+//     if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+//       return apiResponse(res, 404, false, "Invalid Category Id");
+//     }
+
+//     const updatedCategory = await categoryModel.findByIdAndUpdate(
+//       categoryId,
+//       { $set: updates },
+//       { new: true }
+//     );
+
+//     if (!updatedCategory) {
+//       return apiResponse(res, 404, false, "Category not found");
+//     }
+
+//     return apiResponse(
+//       res,
+//       200,
+//       true,
+//       "Category Updates Successfully",
+//       updatedCategory
+//     );
+//   } catch (error) {
+//     console.error("Error while updating category", error);
+//     return apiResponse(res, 500, false, "Error while updating category");
+//   }
+// };
+
+// Update the category
 const updateCategory = async (req: Request, res: Response) => {
   try {
     const { categoryId } = req.params;
-    const updates = req.body;
 
+    // Validate categoryId
     if (!mongoose.Types.ObjectId.isValid(categoryId)) {
       return apiResponse(res, 404, false, "Invalid Category Id");
+    }
+
+    // Initialize updates object
+    let updates: { [key: string]: any } = {};
+
+    // Extract and parse data from the "data" field in form-data
+    if (req.body.data) {
+      try {
+        const parsedData = JSON.parse(req.body.data); // Parse JSON string
+        updates.name = parsedData.name || undefined; // Extract name
+        updates.description = parsedData.description || undefined; // Extract description
+
+        if (updates.name) {
+          updates.slug = slugify(updates.name, { lower: true });
+        }
+      } catch (error) {
+        return apiResponse(
+          res,
+          400,
+          false,
+          "Invalid data format in 'data' field"
+        );
+      }
+    }
+
+    if (req.body.imageUrls) {
+      updates.images = req.body.imageUrls;
     }
 
     const updatedCategory = await categoryModel.findByIdAndUpdate(
       categoryId,
       { $set: updates },
-      { new: true }
+      { new: true, runValidators: true }
     );
 
     if (!updatedCategory) {
@@ -140,11 +198,11 @@ const updateCategory = async (req: Request, res: Response) => {
       res,
       200,
       true,
-      "Category Updates Successfully",
+      "Category updated successfully",
       updatedCategory
     );
   } catch (error) {
-    console.error("Error while updating category", error);
+    console.error("Error while updating category:", error);
     return apiResponse(res, 500, false, "Error while updating category");
   }
 };
@@ -361,56 +419,6 @@ const createSubCategory = async (req: Request, res: Response) => {
   }
 };
 
-const updateSubCategory = async (req: Request, res: Response) => {
-  try {
-    const { categoryId, subCategoryId } = req.params;
-    if (
-      !mongoose.Types.ObjectId.isValid(categoryId) ||
-      !mongoose.Types.ObjectId.isValid(subCategoryId)
-    ) {
-      return apiResponse(res, 400, false, "Invalid category or subcategory ID");
-    }
-
-    const { name, description, image } = req.body;
-
-    if (!name || !description) {
-      return apiResponse(res, 400, false, "Name and description are required");
-    }
-
-    let slug = req.body.slug;
-    const updateDate: any = {};
-    if (name) {
-      updateDate.name = name;
-      if (!slug) {
-        slug = slugify(name, { lower: true });
-      }
-    }
-    if (description) {
-      updateDate.description = description;
-    }
-    if (image) {
-      updateDate.image = image;
-    }
-
-    const updatedSubCategory = await categoryModel.findByIdAndUpdate(
-      subCategoryId,
-      updateDate,
-      { new: true }
-    );
-
-    return apiResponse(
-      res,
-      200,
-      true,
-      "SubCategory updated",
-      updatedSubCategory
-    );
-  } catch (error) {
-    console.error("Error updating subcategory:", error);
-    return apiResponse(res, 500, false, "Internal server error");
-  }
-};
-
 const deleteSubCategory = async (req: Request, res: Response) => {
   try {
     const { categoryId, subCategoryId } = req.params;
@@ -499,6 +507,125 @@ export const getSubcategorySkuParameters = async (
   } catch (error) {
     console.error("Error fetching SKU parameters:", error);
     return apiResponse(res, 500, false, "Internal server error");
+  }
+};
+
+// Fetch All subCategories
+
+export const getAllSubcategories = async (req: Request, res: Response) => {
+  try {
+    const { categoryId } = req.params;
+
+    if (!categoryId) {
+      return apiResponse(res, 400, false, "Category ID is required");
+    }
+
+    const subcategories = await categoryModel
+      .find({
+        parentCategoryId: categoryId,
+        status: true,
+      })
+      .select("-__v -createdAt -updatedAt");
+
+    if (subcategories.length === 0) {
+      return apiResponse(
+        res,
+        404,
+        false,
+        "Subcategories not found under this category"
+      );
+    }
+
+    return apiResponse(
+      res,
+      200,
+      true,
+      "Subcategories fetched successfully",
+      subcategories
+    );
+  } catch (error) {
+    console.error("Error ");
+  }
+};
+
+const updateSubCategory = async (req: Request, res: Response) => {
+  try {
+    const { categoryId, subCategoryId } = req.params;
+
+    console.log("Request Body : ",req.body);
+
+    if (
+      !mongoose.Types.ObjectId.isValid(categoryId) ||
+      !mongoose.Types.ObjectId.isValid(subCategoryId)
+    ) {
+      return apiResponse(res, 400, false, "Invalid category or subcategory ID");
+    }
+
+    // Fetch existing subcategory
+    const subCategory = await categoryModel.findById(subCategoryId);
+    if (!subCategory) {
+      return apiResponse(res, 404, false, "Subcategory not found");
+    }
+
+    let updateData: { [key: string]: any } = {};
+
+    // Check if 'data' field exists and parse it
+    if (req.body.data) {
+      try {
+        const parsedData = JSON.parse(req.body.data); // Parse JSON string in 'data'
+        console.log("Parsed Data:", parsedData);
+
+        updateData.name = parsedData.name || undefined;
+        updateData.description = parsedData.description || undefined;
+        updateData.skuParameters = parsedData.skuParameters || undefined;
+
+        if (updateData.name) {
+          updateData.slug = slugify(updateData.name, { lower: true });
+        }
+      } catch (error) {
+        return apiResponse(
+          res,
+          400,
+          false,
+          "Invalid JSON format in 'data' field"
+        );
+      }
+    } else {
+      return apiResponse(res, 400, false, "'data' field is required");
+    }
+
+    // Check if 'images' field exists and handle it
+    if (req.body.imageUrls && Array.isArray(req.body.imageUrls)) {
+      updateData.images = req.body.imageUrls; // Update images if provided
+    } else if (req.body.imageUrl) {
+      updateData.images = [req.body.imageUrl]; // Handle single image
+    }
+
+    console.log("Update Data before applying:", updateData);
+
+    // Update the subcategory in the database
+    const updatedSubCategory = await categoryModel.findByIdAndUpdate(
+      subCategoryId,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    );
+
+    console.log("Updated SubCategory:", updatedSubCategory);
+
+    if (!updatedSubCategory) {
+      return apiResponse(res, 404, false, "Subcategory not found");
+    }
+
+    return apiResponse(
+      res,
+      200,
+      true,
+      "Subcategory updated successfully",
+      updatedSubCategory
+    );
+  } catch (error) {
+    console.error("Error while updating subcategory:", error);
+    return apiResponse(res, 500, false, "Error while updating subcategory");
   }
 };
 

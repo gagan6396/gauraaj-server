@@ -216,7 +216,7 @@ const createOrder = async (req: Request, res: Response) => {
 
     // Create ShipRocket Order using extracted dimensions
     const response = await createShipRocketOrder({
-      orderId: savedOrder._id.toString(), // Convert ObjectId to string
+      orderId: savedOrder._id.toString(), 
       products: updatedProducts,
       addressSnapshot,
     });
