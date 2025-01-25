@@ -70,7 +70,7 @@ const createCategory = async (req: Request, res: Response) => {
 const getAllCategory = async (req: Request, res: Response) => {
   try {
     const category = await categoryModel
-      .find()
+      .find({ parentCategoryId: null })
       .populate("parentCategoryId", "name")
       .sort({ name: 1 });
 
@@ -689,7 +689,16 @@ const updateSubCategory = async (req: Request, res: Response) => {
 };
 
 export {
-  createCategory, createSubCategory, deleteCategory, deleteSubCategory,
-  fetchCategoryById, fetchProductBySubCategory, fetchSubCategoryById, getAllCategory, subCategoryFetching, updateCategory, updateSubCategory
+  createCategory,
+  createSubCategory,
+  deleteCategory,
+  deleteSubCategory,
+  fetchCategoryById,
+  fetchProductBySubCategory,
+  fetchSubCategoryById,
+  getAllCategory,
+  subCategoryFetching,
+  updateCategory,
+  updateSubCategory
 };
 
