@@ -148,24 +148,80 @@ const fetchCategoryById = async (req: Request, res: Response) => {
 // };
 
 // Update the category
+// const updateCategory = async (req: Request, res: Response) => {
+//   try {
+//     const { categoryId } = req.params;
+
+//     // Validate categoryId
+//     if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+//       return apiResponse(res, 404, false, "Invalid Category Id");
+//     }
+
+//     // Initialize updates object
+//     let updates: { [key: string]: any } = {};
+
+//     // Extract and parse data from the "data" field in form-data
+//     if (req.body.data) {
+//       try {
+//         const parsedData = JSON.parse(req.body.data); // Parse JSON string
+//         updates.name = parsedData.name || undefined; // Extract name
+//         updates.description = parsedData.description || undefined; // Extract description
+
+//         if (updates.name) {
+//           updates.slug = slugify(updates.name, { lower: true });
+//         }
+//       } catch (error) {
+//         return apiResponse(
+//           res,
+//           400,
+//           false,
+//           "Invalid data format in 'data' field"
+//         );
+//       }
+//     }
+
+//     if (req.body.imageUrls) {
+//       updates.images = req.body.imageUrls;
+//     }
+
+//     const updatedCategory = await categoryModel.findByIdAndUpdate(
+//       categoryId,
+//       { $set: updates },
+//       { new: true, runValidators: true }
+//     );
+
+//     if (!updatedCategory) {
+//       return apiResponse(res, 404, false, "Category not found");
+//     }
+
+//     return apiResponse(
+//       res,
+//       200,
+//       true,
+//       "Category updated successfully",
+//       updatedCategory
+//     );
+//   } catch (error) {
+//     console.error("Error while updating category:", error);
+//     return apiResponse(res, 500, false, "Error while updating category");
+//   }
+// };
+
 const updateCategory = async (req: Request, res: Response) => {
   try {
     const { categoryId } = req.params;
 
-    // Validate categoryId
     if (!mongoose.Types.ObjectId.isValid(categoryId)) {
       return apiResponse(res, 404, false, "Invalid Category Id");
     }
 
-    // Initialize updates object
     let updates: { [key: string]: any } = {};
 
-    // Extract and parse data from the "data" field in form-data
     if (req.body.data) {
       try {
-        const parsedData = JSON.parse(req.body.data); // Parse JSON string
-        updates.name = parsedData.name || undefined; // Extract name
-        updates.description = parsedData.description || undefined; // Extract description
+        const parsedData = JSON.parse(req.body.data);
+        updates.name = parsedData.name || undefined;
+        updates.description = parsedData.description || undefined;
 
         if (updates.name) {
           updates.slug = slugify(updates.name, { lower: true });
@@ -180,7 +236,11 @@ const updateCategory = async (req: Request, res: Response) => {
       }
     }
 
-    if (req.body.imageUrls) {
+    // if (req.body.imageUrls !== undefined && req.body.imageUrls !== null ) {
+    //   updates.images = req.body.imageUrls;
+    // }
+
+    if (req.body.imageUrls.length !== 0) {
       updates.images = req.body.imageUrls;
     }
 
@@ -480,7 +540,6 @@ export const getSubcategorySkuParameters = async (
     console.log("Category ID:", categoryId); // Log categoryId
     console.log("Subcategory ID:", subCategoryId); // Log subcategoryId
 
-    // Fetch the subcategory based on the subcategoryId and parentCategoryId
     const subcategory = await categoryModel
       .findOne({ _id: subCategoryId, parentCategoryId: categoryId })
       .lean<ICategory>();
@@ -552,7 +611,7 @@ const updateSubCategory = async (req: Request, res: Response) => {
   try {
     const { categoryId, subCategoryId } = req.params;
 
-    console.log("Request Body : ",req.body);
+    console.log("Request Body : ", req.body);
 
     if (
       !mongoose.Types.ObjectId.isValid(categoryId) ||
