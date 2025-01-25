@@ -48,7 +48,12 @@ categoryRoute.get(
   "/:categoryId/subcategory/:subCategoryId",
   fetchSubCategoryById
 );
-categoryRoute.put("/:categoryId/subcategory/:subCategoryId", updateSubCategory);
+categoryRoute.put(
+  "/:categoryId/subcategory/:subCategoryId",
+  handleImageUpload,
+  updateSubCategory
+);
+
 categoryRoute.delete(
   "/:categoryId/subcategory/:subCategoryId",
   deleteSubCategory

@@ -419,56 +419,6 @@ const createSubCategory = async (req: Request, res: Response) => {
   }
 };
 
-const updateSubCategory = async (req: Request, res: Response) => {
-  try {
-    const { categoryId, subCategoryId } = req.params;
-    if (
-      !mongoose.Types.ObjectId.isValid(categoryId) ||
-      !mongoose.Types.ObjectId.isValid(subCategoryId)
-    ) {
-      return apiResponse(res, 400, false, "Invalid category or subcategory ID");
-    }
-
-    const { name, description, image } = req.body;
-
-    if (!name || !description) {
-      return apiResponse(res, 400, false, "Name and description are required");
-    }
-
-    let slug = req.body.slug;
-    const updateDate: any = {};
-    if (name) {
-      updateDate.name = name;
-      if (!slug) {
-        slug = slugify(name, { lower: true });
-      }
-    }
-    if (description) {
-      updateDate.description = description;
-    }
-    if (image) {
-      updateDate.image = image;
-    }
-
-    const updatedSubCategory = await categoryModel.findByIdAndUpdate(
-      subCategoryId,
-      updateDate,
-      { new: true }
-    );
-
-    return apiResponse(
-      res,
-      200,
-      true,
-      "SubCategory updated",
-      updatedSubCategory
-    );
-  } catch (error) {
-    console.error("Error updating subcategory:", error);
-    return apiResponse(res, 500, false, "Internal server error");
-  }
-};
-
 const deleteSubCategory = async (req: Request, res: Response) => {
   try {
     const { categoryId, subCategoryId } = req.params;
@@ -595,6 +545,87 @@ export const getAllSubcategories = async (req: Request, res: Response) => {
     );
   } catch (error) {
     console.error("Error ");
+  }
+};
+
+const updateSubCategory = async (req: Request, res: Response) => {
+  try {
+    const { categoryId, subCategoryId } = req.params;
+
+    console.log("Request Body : ",req.body);
+
+    if (
+      !mongoose.Types.ObjectId.isValid(categoryId) ||
+      !mongoose.Types.ObjectId.isValid(subCategoryId)
+    ) {
+      return apiResponse(res, 400, false, "Invalid category or subcategory ID");
+    }
+
+    // Fetch existing subcategory
+    const subCategory = await categoryModel.findById(subCategoryId);
+    if (!subCategory) {
+      return apiResponse(res, 404, false, "Subcategory not found");
+    }
+
+    let updateData: { [key: string]: any } = {};
+
+    // Check if 'data' field exists and parse it
+    if (req.body.data) {
+      try {
+        const parsedData = JSON.parse(req.body.data); // Parse JSON string in 'data'
+        console.log("Parsed Data:", parsedData);
+
+        updateData.name = parsedData.name || undefined;
+        updateData.description = parsedData.description || undefined;
+        updateData.skuParameters = parsedData.skuParameters || undefined;
+
+        if (updateData.name) {
+          updateData.slug = slugify(updateData.name, { lower: true });
+        }
+      } catch (error) {
+        return apiResponse(
+          res,
+          400,
+          false,
+          "Invalid JSON format in 'data' field"
+        );
+      }
+    } else {
+      return apiResponse(res, 400, false, "'data' field is required");
+    }
+
+    // Check if 'images' field exists and handle it
+    if (req.body.imageUrls && Array.isArray(req.body.imageUrls)) {
+      updateData.images = req.body.imageUrls; // Update images if provided
+    } else if (req.body.imageUrl) {
+      updateData.images = [req.body.imageUrl]; // Handle single image
+    }
+
+    console.log("Update Data before applying:", updateData);
+
+    // Update the subcategory in the database
+    const updatedSubCategory = await categoryModel.findByIdAndUpdate(
+      subCategoryId,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    );
+
+    console.log("Updated SubCategory:", updatedSubCategory);
+
+    if (!updatedSubCategory) {
+      return apiResponse(res, 404, false, "Subcategory not found");
+    }
+
+    return apiResponse(
+      res,
+      200,
+      true,
+      "Subcategory updated successfully",
+      updatedSubCategory
+    );
+  } catch (error) {
+    console.error("Error while updating subcategory:", error);
+    return apiResponse(res, 500, false, "Error while updating subcategory");
   }
 };
 
