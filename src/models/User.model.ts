@@ -8,8 +8,8 @@ export interface User extends Document {
   phone: string;
   googleId?: string;
   role: "Guest User" | "User";
-  passwordResetOTP: number;
-  passwordResetOTPExpiration: Date;
+  passwordResetToken: string | null; // Added for token-based password reset
+  passwordResetTokenExpiration: Date | null; // Added for token expiration
   createdAt: Date;
   updatedAt: Date;
 }
@@ -48,11 +48,13 @@ const userSchema: Schema<User> = new mongoose.Schema(
       required: true,
       default: "User",
     },
-    passwordResetOTP: {
-      type: Number,
+    passwordResetToken: {
+      type: String,
+      default: null, // Set default to null
     },
-    passwordResetOTPExpiration: {
+    passwordResetTokenExpiration: {
       type: Date,
+      default: null, // Set default to null
     },
   },
   {

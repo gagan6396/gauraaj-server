@@ -22,8 +22,8 @@ export interface Supplier extends Document {
   averageRating: number;
   approval_status: "Pending" | "Approved" | "Rejected";
   totalOrders: number;
-  passwordResetOTP: number;
-  passwordResetOTPExpiration: Date;
+  passwordResetToken: string | null;  // Added for token-based password reset
+  passwordResetTokenExpiration: Date | null;  // Added for token expiration
   createdAt: Date;
   updatedAt: Date;
 }
@@ -112,11 +112,13 @@ const supplierSchema: Schema<Supplier> = new Schema(
       type: Number,
       default: 0,
     },
-    passwordResetOTP: {
-      type: Number,
+    passwordResetToken: { 
+      type: String, 
+      default: null // Set default to null
     },
-    passwordResetOTPExpiration: {
-      type: Date,
+    passwordResetTokenExpiration: { 
+      type: Date, 
+      default: null // Set default to null
     },
   },
   {

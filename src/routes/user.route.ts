@@ -2,7 +2,6 @@ import express, { Router } from "express";
 import {
   LoginUser,
   RegisterUser,
-  forgat_password,
   reset_password,
   logOut,
 } from "../controllers/userauth.controller";
@@ -25,11 +24,6 @@ userRoute.post(
   "/auth/login",
   // validateRequest({ body: loginSchema }),
   LoginUser
-);
-userRoute.post(
-  "/auth/forgot_password",
-  // validateRequest({ body: forgotPasswordSchema }),
-  forgat_password
 );
 userRoute.post(
   "/auth/reset_password",

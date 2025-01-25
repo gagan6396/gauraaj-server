@@ -1,9 +1,9 @@
 import bcrypt from "bcrypt";
 import { Request, Response } from "express";
+import jwt from "jsonwebtoken";
 import adminModel from "../models/Admin.model";
 import supplierModel from "../models/Supplier.model";
 import apiResponse from "../utils/ApiResponse";
-import { sendOtpEmail } from "../utils/EmailHelper";
 import { sendEmailToAdmins } from "../utils/EmailSend";
 import { generateToken } from "../utils/jwtHelper";
 
@@ -98,6 +98,58 @@ const registerSupplier = async (req: Request, res: Response) => {
   }
 };
 
+// const loginSupplier = async (req: Request, res: Response) => {
+//   try {
+//     const { email, password } = req.body;
+
+//     if (!email || !password) {
+//       return apiResponse(res, 400, false, "Email and password are required.");
+//     }
+
+//     // Find the supplier
+//     const supplier = await supplierModel.findOne({ email });
+//     if (!supplier) {
+//       return apiResponse(res, 404, false, "Supplier not found.");
+//     }
+
+//     if (supplier.approval_status !== "Approved") {
+//       return apiResponse(
+//         res,
+//         403,
+//         false,
+//         "Your account has not been approved by the admin."
+//       );
+//     }
+
+//     // Validating the password if approved
+//     const isValidPassword = await bcrypt.compare(password, supplier.password);
+//     if (!isValidPassword) {
+//       return apiResponse(res, 401, false, "Invalid password.");
+//     }
+
+//     const token = generateToken({ id: supplier._id, role: "Supplier" });
+
+//     return apiResponse(res, 200, true, "Login Successfull", {
+//       token,
+//       supplier: {
+//         id: supplier._id,
+//         username: supplier.username,
+//         email: supplier.email,
+//         phone: supplier.phone,
+//         shop_name: supplier.shop_name,
+//         shop_address: supplier.shop_address,
+//         profileImage: supplier.profileImage,
+//         approval_status: supplier.approval_status,
+//         createdAt: supplier.createdAt,
+//         updatedAt: supplier.updatedAt,
+//       },
+//     });
+//   } catch (error) {
+//     console.error("Error logging Supplier", error);
+//     return apiResponse(res, 500, false, "Internal server error.");
+//   }
+// };
+
 const loginSupplier = async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
@@ -106,7 +158,6 @@ const loginSupplier = async (req: Request, res: Response) => {
       return apiResponse(res, 400, false, "Email and password are required.");
     }
 
-    // Find the supplier
     const supplier = await supplierModel.findOne({ email });
     if (!supplier) {
       return apiResponse(res, 404, false, "Supplier not found.");
@@ -121,13 +172,16 @@ const loginSupplier = async (req: Request, res: Response) => {
       );
     }
 
-    // Validating the password if approved
+    // Validating the password
     const isValidPassword = await bcrypt.compare(password, supplier.password);
     if (!isValidPassword) {
       return apiResponse(res, 401, false, "Invalid password.");
     }
 
     const token = generateToken({ id: supplier._id, role: "Supplier" });
+
+    supplier.passwordResetToken = token;
+    await supplier.save();
 
     return apiResponse(res, 200, true, "Login Successfull", {
       token,
@@ -150,79 +204,119 @@ const loginSupplier = async (req: Request, res: Response) => {
   }
 };
 
-const supplierForgatPassword = async (req: Request, res: Response) => {
-  try {
-    const { email } = req.body;
-    if (!email) {
-      return apiResponse(res, 400, false, "Email is required.");
-    }
+// const supplierForgatPassword = async (req: Request, res: Response) => {
+//   try {
+//     const { email } = req.body;
+//     if (!email) {
+//       return apiResponse(res, 400, false, "Email is required.");
+//     }
 
-    const supplier = await supplierModel.findOne({
-      email,
-    });
+//     const supplier = await supplierModel.findOne({
+//       email,
+//     });
 
-    if (!supplier) {
-      return apiResponse(res, 404, false, "Supplier not found.");
-    }
+//     if (!supplier) {
+//       return apiResponse(res, 404, false, "Supplier not found.");
+//     }
 
-    const otp = await sendOtpEmail(email);
+//     const otp = await sendOtpEmail(email);
 
-    supplier.passwordResetOTP = otp;
-    supplier.passwordResetOTPExpiration = Date.now() + 600000; // 10 minutes
-    await supplier.save();
+//     supplier.passwordResetOTP = otp;
+//     supplier.passwordResetOTPExpiration = Date.now() + 600000; // 10 minutes
+//     await supplier.save();
 
-    return apiResponse(res, 200, true, "OTP sent successfully!");
-  } catch (error) {
-    console.error("Error Forgoting Supplier Password", error);
-    return apiResponse(res, 500, false, "Internal server error.");
-  }
-};
+//     return apiResponse(res, 200, true, "OTP sent successfully!");
+//   } catch (error) {
+//     console.error("Error Forgoting Supplier Password", error);
+//     return apiResponse(res, 500, false, "Internal server error.");
+//   }
+// };
+
+// const supplierResetPassword = async (req: Request, res: Response) => {
+//   try {
+//     const { email, otp, newPassword } = req.body;
+
+//     if (!email || !otp || !newPassword) {
+//       return apiResponse(
+//         res,
+//         400,
+//         false,
+//         "Email, OTP, and new password are required"
+//       );
+//     }
+
+//     // Find the supplier by email
+//     const supplier = await supplierModel.findOne({ email });
+//     if (!supplier) {
+//       return apiResponse(res, 404, false, "Supplier not found");
+//     }
+
+//     // Verify OTP
+//     if (supplier.passwordResetOTP !== otp) {
+//       return apiResponse(res, 400, false, "Invalid OTP");
+//     }
+
+//     // Check OTP expiration
+//     if (Date.now() > supplier.passwordResetOTPExpiration) {
+//       return apiResponse(res, 400, false, "OTP has expired");
+//     }
+
+//     // Hash the new password (await the promise)
+//     const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+//     // Update the supplier's password
+//     supplier.password = hashedPassword;
+
+//     // Clear OTP fields
+//     supplier.passwordResetOTP = null;
+//     supplier.passwordResetOTPExpiration = null;
+
+//     // Save the updated supplier document
+//     await supplier.save();
+
+//     return apiResponse(res, 200, true, "Supplier password reset successfully");
+//   } catch (error) {
+//     console.error("Error resetting supplier password:", error);
+//     return apiResponse(res, 500, false, "Internal server error.");
+//   }
+// };
 
 const supplierResetPassword = async (req: Request, res: Response) => {
   try {
-    const { email, otp, newPassword } = req.body;
-
-    if (!email || !otp || !newPassword) {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) {
       return apiResponse(
         res,
         400,
         false,
-        "Email, OTP, and new password are required"
+        "Token and new password are required"
       );
     }
 
-    // Find the supplier by email
-    const supplier = await supplierModel.findOne({ email });
+    const supplier = await supplierModel.findOne({
+      passwordResetToken: token,
+    });
     if (!supplier) {
       return apiResponse(res, 404, false, "Supplier not found");
     }
 
-    // Verify OTP
-    if (supplier.passwordResetOTP !== otp) {
-      return apiResponse(res, 400, false, "Invalid OTP");
+    try {
+      jwt.verify(token, process.env.JWT_SECRET || "secret");
+    } catch (error) {
+      return apiResponse(res, 400, false, "Invalid or expired token");
     }
 
-    // Check OTP expiration
-    if (Date.now() > supplier.passwordResetOTPExpiration) {
-      return apiResponse(res, 400, false, "OTP has expired");
-    }
-
-    // Hash the new password (await the promise)
+    const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
 
-    // Update the supplier's password
     supplier.password = hashedPassword;
 
-    // Clear OTP fields
-    supplier.passwordResetOTP = null;
-    supplier.passwordResetOTPExpiration = null;
-
-    // Save the updated supplier document
+    supplier.passwordResetToken = null;
     await supplier.save();
 
-    return apiResponse(res, 200, true, "Supplier password reset successfully");
+    return apiResponse(res, 200, true, "Supplier password reset successfully.");
   } catch (error) {
-    console.error("Error resetting supplier password:", error);
+    console.error("Error while Reseting user's password", error);
     return apiResponse(res, 500, false, "Internal server error.");
   }
 };
@@ -238,6 +332,6 @@ const supplierLogOut = async (req: Request, res: Response) => {
 };
 
 export {
-  loginSupplier, registerSupplier, supplierForgatPassword, supplierLogOut, supplierResetPassword
+  loginSupplier, registerSupplier, supplierLogOut, supplierResetPassword
 };
 
