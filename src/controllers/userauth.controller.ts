@@ -5,9 +5,12 @@ import apiResponse from "../utils/ApiResponse";
 import { generateToken } from "../utils/jwtHelper";
 import { sendOtpEmail } from "../utils/EmailHelper";
 import profileModel from "../models/Profile.model";
+import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 
 import wishlistModel from "../models/WishList";
+import { JsonWebTokenError } from "jsonwebtoken";
+import { use } from "passport";
 
 const RegisterUser = async (req: Request, res: Response) => {
   try {
@@ -88,6 +91,9 @@ const LoginUser = async (req: Request, res: Response) => {
     // Generate the jwt token
     const token = generateToken({ id: userExist._id, email: userExist.email });
 
+    userExist.passwordResetToken = token;
+    await userExist.save();
+
     return apiResponse(res, 200, true, "Login Successfull", {
       token,
       user: {
@@ -111,74 +117,109 @@ const logOut = async (req: Request, res: Response) => {
   }
 };
 
-const forgat_password = async (req: Request, res: Response) => {
-  try {
-    const { email } = req.body;
+// const forgat_password = async (req: Request, res: Response) => {
+//   try {
+//     const { email } = req.body;
 
-    if (!email) {
-      return apiResponse(res, 400, false, "Please fill all fields");
-    }
+//     if (!email) {
+//       return apiResponse(res, 400, false, "Please fill all fields");
+//     }
 
-    const user = await userModel.findOne({
-      email,
-    });
+//     const user = await userModel.findOne({
+//       email,
+//     });
 
-    if (!user) {
-      return apiResponse(res, 404, false, "User not found");
-    }
+//     if (!user) {
+//       return apiResponse(res, 404, false, "User not found");
+//     }
 
-    // send and generate the otp
-    const otp = await sendOtpEmail(user.email);
+//     // send and generate the otp
+//     const otp = await sendOtpEmail(user.email);
 
-    user.passwordResetOTP = otp;
-    user.passwordResetOTPExpiration = Date.now() + 600000;
-    await user.save();
+//     user.passwordResetOTP = otp;
+//     user.passwordResetOTPExpiration = Date.now() + 600000;
+//     await user.save();
 
-    return apiResponse(res, 200, true, "Otp sent succesfully!");
-  } catch (error) {
-    console.error("Error forgetting password", error);
-    return apiResponse(res, 500, false, "Internal server error");
-  }
-};
+//     return apiResponse(res, 200, true, "Otp sent succesfully!");
+//   } catch (error) {
+//     console.error("Error forgetting password", error);
+//     return apiResponse(res, 500, false, "Internal server error");
+//   }
+// };
+
+// const reset_password = async (req: Request, res: Response) => {
+//   try {
+//     const { email, otp, newPassword } = req.body;
+//     const saltRounds = 10;
+
+//     if (!email || !otp || !newPassword) {
+//       return apiResponse(res, 400, false, "Please fill all fields");
+//     }
+
+//     const user = await userModel.findOne({
+//       email,
+//     });
+
+//     if (!user) {
+//       return apiResponse(res, 404, false, "User not found");
+//     }
+
+//     if (user.passwordResetOTP !== otp) {
+//       return apiResponse(res, 400, false, "Invalid otp");
+//     }
+
+//     // Check if otp is expired or not
+//     if (Date.now() > user.passwordResetOTPExpiration) {
+//       return apiResponse(res, 400, false, "Otp has expired");
+//     }
+
+//     // hash the newPassword
+//     const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+//     user.password = hashedPassword;
+//     user.passwordResetOTP = null;
+//     user.passwordResetOTPExpiration = null;
+//     await user.save();
+
+//     return apiResponse(res, 200, true, "Password reset Succesfully!");
+//   } catch (error) {
+//     console.error("Error Reseting password", error);
+//     return apiResponse(res, 500, false, "Internal server error");
+//   }
+// };
 
 const reset_password = async (req: Request, res: Response) => {
   try {
-    const { email, otp, newPassword } = req.body;
-    const saltRounds = 10;
-
-    if (!email || !otp || !newPassword) {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) {
       return apiResponse(res, 400, false, "Please fill all fields");
     }
 
-    const user = await userModel.findOne({
-      email,
+    const userExist = await userModel.findOne({
+      passwordResetToken: token,
     });
 
-    if (!user) {
+    if (!userExist) {
       return apiResponse(res, 404, false, "User not found");
     }
 
-    if (user.passwordResetOTP !== otp) {
-      return apiResponse(res, 400, false, "Invalid otp");
+    try {
+      jwt.verify(token, process.env.JWT_SECRET || "secret");
+    } catch (error) {
+      return apiResponse(res, 400, false, "Invalid or expired token");
     }
 
-    // Check if otp is expired or not
-    if (Date.now() > user.passwordResetOTPExpiration) {
-      return apiResponse(res, 400, false, "Otp has expired");
-    }
-
-    // hash the newPassword
+    const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
-    user.password = hashedPassword;
-    user.passwordResetOTP = null;
-    user.passwordResetOTPExpiration = null;
-    await user.save();
 
-    return apiResponse(res, 200, true, "Password reset Succesfully!");
+    userExist.password = hashedPassword;
+    userExist.passwordResetToken = null;
+
+    await userExist.save();
+
+    return apiResponse(res, 200, true, "User password reset successfully!");
   } catch (error) {
-    console.error("Error Reseting password", error);
+    console.error("Error while user reset password", error);
     return apiResponse(res, 500, false, "Internal server error");
   }
 };
-
-export { RegisterUser, LoginUser, logOut, forgat_password, reset_password };
+export { RegisterUser, LoginUser, logOut, reset_password };
