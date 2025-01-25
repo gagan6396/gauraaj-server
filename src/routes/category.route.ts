@@ -34,7 +34,7 @@ categoryRoute.post("/", handleImageUpload, createCategory);
 categoryRoute.get("/", getAllCategory);
 categoryRoute.get("/:categoryId", fetchCategoryById);
 categoryRoute.get("/:categoryId/subcategory", subCategoryFetching);
-categoryRoute.put("/:categoryId", updateCategory);
+categoryRoute.put("/:categoryId", handleImageUpload, updateCategory);
 categoryRoute.delete("/:categoryId", deleteCategory);
 
 // Subcategory Creation
