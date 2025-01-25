@@ -11,6 +11,7 @@ import {
   fetchCategoryById,
   fetchSubCategoryById,
   fetchProductBySubCategory,
+  getAllSubcategories,
   getSubcategorySkuParameters,
 } from "../controllers/category.controller";
 import {
@@ -61,5 +62,7 @@ categoryRoute.get(
   "/:categoryId/subcategory/:subCategoryId/parameters",
   getSubcategorySkuParameters
 );
+
+categoryRoute.get("/:categoryId/subcategories", getAllSubcategories);
 
 export default categoryRoute;
