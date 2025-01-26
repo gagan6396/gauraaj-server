@@ -3,8 +3,10 @@ import {
   addProductBySupplier,
   deleteProductBySupplier,
   getAllSupplierProducts,
+  getProductById,
   updateProductBySupplier,
 } from "../controllers/supplierProduct.controller";
+import authMiddleware from "../middlewares/authMiddleware";
 import handleImageUpload from "../middlewares/imageMiddleware";
 
 const supplierProductRoute = Router();
@@ -12,29 +14,29 @@ const supplierProductRoute = Router();
 // Define here the supplierProduct Routes
 supplierProductRoute.post(
   "/:supplierId",
+  authMiddleware,
   handleImageUpload,
   addProductBySupplier
 );
 supplierProductRoute.patch(
-  "/:supplierId",
+  "/:productId",
+  authMiddleware,
   handleImageUpload,
-  // validateRequest({
-  //   params: supplierIdParamsSchema,
-  //   body: supplierUpdateProductSchema,
-  // }),
   updateProductBySupplier
 );
 supplierProductRoute.delete(
-  "/:supplierId/:productId",
-  // validateRequest({ params: supplierIdParamsSchema }),
+  "/:productId",
+  authMiddleware,
   deleteProductBySupplier
 );
 supplierProductRoute.get(
+  "/product-by-id/:productId",
+  authMiddleware,
+  getProductById
+);
+supplierProductRoute.get(
   "/:supplierId",
-  // validateRequest({
-  //   params: supplierIdParamsSchema,
-  //   body: getAllSupplierProductsSchema,
-  // }),
+  authMiddleware,
   getAllSupplierProducts
 );
 

@@ -1,4 +1,4 @@
-import { Response, Request, NextFunction } from "express";
+import { NextFunction, Request, Response } from "express";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import apiResponse from "../utils/ApiResponse";
 
@@ -13,13 +13,14 @@ interface DecodedUser extends JwtPayload {
 
 const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
   const token = req.header("Authorization")?.replace("Bearer ", "");
+
   if (!token) {
     return apiResponse(res, 401, false, "Access Denied: No token provided");
   }
 
+  const decoded = jwt.verify(token, JWT_SECRET) as DecodedUser;
+  
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as DecodedUser;
-
     (req as Request & { user: DecodedUser }).user = {
       id: decoded.id,
       first_name: decoded.first_name,
