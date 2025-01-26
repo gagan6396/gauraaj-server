@@ -1,7 +1,7 @@
-import supplierModel from "../models/Supplier.model";
-import { Response, Request } from "express";
-import apiResponse from "../utils/ApiResponse";
+import { Request, Response } from "express";
 import { redisClient } from "../config/redisClient";
+import supplierModel from "../models/Supplier.model";
+import apiResponse from "../utils/ApiResponse";
 
 // Supplier Profile managment Controller
 const getSupplierProfile = async (req: Request, res: Response) => {
@@ -13,19 +13,19 @@ const getSupplierProfile = async (req: Request, res: Response) => {
     }
 
     // Check Redis cache first
-    const cachedSupplierProfile = await redisClient.get(
-      `supplierProfile:${supplierId}`
-    );
-    if (cachedSupplierProfile) {
-      console.log("Returning supplier profile from cache.");
-      return apiResponse(
-        res,
-        200,
-        true,
-        "Supplier profile fetched successfully (from cache)",
-        JSON.parse(cachedSupplierProfile)
-      );
-    }
+    // const cachedSupplierProfile = await redisClient.get(
+    //   `supplierProfile:${supplierId}`
+    // );
+    // if (cachedSupplierProfile) {
+    //   console.log("Returning supplier profile from cache.");
+    //   return apiResponse(
+    //     res,
+    //     200,
+    //     true,
+    //     "Supplier profile fetched successfully (from cache)",
+    //     JSON.parse(cachedSupplierProfile)
+    //   );
+    // }
 
     const supplier = await supplierModel
       .findById(supplierId)
@@ -131,3 +131,4 @@ const updateSupplierProfile = async (req: Request, res: Response) => {
 };
 
 export { getSupplierProfile, updateSupplierProfile };
+

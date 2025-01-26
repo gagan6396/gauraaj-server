@@ -1,16 +1,11 @@
-import { Request, Response } from "express";
-import userModel from "../models/User.model";
 import bcrypt from "bcrypt";
+import { Request, Response } from "express";
+import jwt from "jsonwebtoken";
+import profileModel from "../models/Profile.model";
+import userModel from "../models/User.model";
 import apiResponse from "../utils/ApiResponse";
 import { generateToken } from "../utils/jwtHelper";
-import { sendOtpEmail } from "../utils/EmailHelper";
-import profileModel from "../models/Profile.model";
-import jwt from "jsonwebtoken";
-import mongoose from "mongoose";
 
-import wishlistModel from "../models/WishList";
-import { JsonWebTokenError } from "jsonwebtoken";
-import { use } from "passport";
 
 const RegisterUser = async (req: Request, res: Response) => {
   try {
@@ -222,4 +217,4 @@ const reset_password = async (req: Request, res: Response) => {
     return apiResponse(res, 500, false, "Internal server error");
   }
 };
-export { RegisterUser, LoginUser, logOut, reset_password };
+export { LoginUser, logOut, RegisterUser, reset_password };

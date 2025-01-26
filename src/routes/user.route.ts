@@ -1,18 +1,10 @@
-import express, { Router } from "express";
+import { Router } from "express";
 import {
   LoginUser,
+  logOut,
   RegisterUser,
   reset_password,
-  logOut,
 } from "../controllers/userauth.controller";
-import {
-  registerSchema,
-  loginSchema,
-  forgotPasswordSchema,
-  resetPasswordSchema,
-} from "../Schema/userAuth.schema";
-import validateRequest from "../middlewares/validateSchema";
-import { register } from "module";
 const userRoute = Router();
 
 userRoute.post(
