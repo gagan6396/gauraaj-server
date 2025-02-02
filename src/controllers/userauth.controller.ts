@@ -14,7 +14,8 @@ import { use } from "passport";
 
 const RegisterUser = async (req: Request, res: Response) => {
   try {
-    const { first_name, last_name, email, phone, password } = req.body;
+    const { first_name, last_name, email, phone, password, googleId } =
+      req.body;
 
     // Validate input fields
     if (!first_name || !last_name || !email || !password || !phone) {
@@ -39,6 +40,11 @@ const RegisterUser = async (req: Request, res: Response) => {
       phone,
       password: hashedPassword,
     });
+
+    // TODO: updated here for google Id
+    if (googleId) {
+      newUser["googleId"] = googleId;
+    }
 
     // Automatically create a profile for the new user
     await profileModel.create({
