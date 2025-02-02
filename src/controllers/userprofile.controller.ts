@@ -10,7 +10,6 @@ import userModel from "../models/User.model";
 import wishlistModel from "../models/WishList";
 import apiResponse from "../utils/ApiResponse";
 
-
 // User Profile Routes
 // const getUserProfile = async (req: Request, res: Response) => {
 //   try {
@@ -279,9 +278,9 @@ const FetchUserWishlist = async (req: Request, res: Response) => {
   }
 };
 
-const addProductToWishlist = async (req: Request, res: Response) => {
+const addProductToWishlist = async (req: any, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = req.user.id;
     const { productId } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
@@ -625,6 +624,16 @@ const FetchUserNotification = async (req: Request, res: Response) => {
 };
 
 export {
-  addProductToWishlist, deleteProductFromWishlist, FetchUserNotification, FetchUserWishlist, getUserLoyaltiPoints, getUserOrderHistory, getUserOrders, getUserProfile, RedeeemLoyaltiPoints, updateUserProfile, updateUserWishlist
+  addProductToWishlist,
+  deleteProductFromWishlist,
+  FetchUserNotification,
+  FetchUserWishlist,
+  getUserLoyaltiPoints,
+  getUserOrderHistory,
+  getUserOrders,
+  getUserProfile,
+  RedeeemLoyaltiPoints,
+  updateUserProfile,
+  updateUserWishlist
 };
 
