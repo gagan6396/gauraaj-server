@@ -38,7 +38,7 @@ profileRoute.get(
   FetchUserWishlist
 );
 profileRoute.post(
-  "/:userId/wishlist",
+  "/wishlist",
   authMiddleware,
   // validateRequest({ params: userIdParamSchema, body: wishlishAddSchema }),
   addProductToWishlist
