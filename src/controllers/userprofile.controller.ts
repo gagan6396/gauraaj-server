@@ -239,9 +239,9 @@ const updateUserProfile = async (req: Request, res: Response) => {
 };
 
 // User Profile Wishlist Fetch Api'
-const FetchUserWishlist = async (req: Request, res: Response) => {
+const FetchUserWishlist = async (req: any, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = req.user.id;
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return apiResponse(res, 404, false, "Invalid user id");

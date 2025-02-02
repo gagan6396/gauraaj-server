@@ -32,7 +32,7 @@ profileRoute.patch(
 
 // User Profile Wishlist Api's
 profileRoute.get(
-  "/:userId/wishlist",
+  "/wishlist",
   authMiddleware,
   // validateRequest({ params: userIdParamSchema }),
   FetchUserWishlist
