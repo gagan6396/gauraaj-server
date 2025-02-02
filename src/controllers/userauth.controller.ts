@@ -6,7 +6,6 @@ import userModel from "../models/User.model";
 import apiResponse from "../utils/ApiResponse";
 import { generateToken } from "../utils/jwtHelper";
 
-
 const RegisterUser = async (req: Request, res: Response) => {
   try {
     const { first_name, last_name, email, phone, password } = req.body;
@@ -35,6 +34,12 @@ const RegisterUser = async (req: Request, res: Response) => {
       password: hashedPassword,
     });
 
+    // Generate the jwt token
+    const token = generateToken({ id: newUser?._id, email: newUser?.email });
+
+    newUser.passwordResetToken = token;
+    await newUser.save();
+
     // Automatically create a profile for the new user
     await profileModel.create({
       user_id: newUser._id,
@@ -51,8 +56,7 @@ const RegisterUser = async (req: Request, res: Response) => {
     // Return success response with minimal user details
     return apiResponse(res, 201, true, "User registered successfully", {
       user: {
-        id: newUser._id,
-        email: newUser.email,
+        token,
       },
     });
   } catch (error) {
@@ -218,3 +222,4 @@ const reset_password = async (req: Request, res: Response) => {
   }
 };
 export { LoginUser, logOut, RegisterUser, reset_password };
+

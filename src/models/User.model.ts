@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from "mongoose";
+import mongoose, { Document, Schema } from "mongoose";
 
 export interface User extends Document {
   first_name: string;
@@ -40,8 +40,6 @@ const userSchema: Schema<User> = new mongoose.Schema(
     },
     googleId: {
       type: String,
-      unique: true,
-      sparse: true,
     },
     role: {
       type: String,
