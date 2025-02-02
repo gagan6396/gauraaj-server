@@ -5,6 +5,7 @@ import {
   deleteCategory,
   deleteSubCategory,
   fetchCategoryById,
+  fetchProductByCategory,
   fetchProductBySubCategory,
   fetchSubCategoryById,
   getAllCategory,
@@ -49,6 +50,7 @@ categoryRoute.delete(
 
 // SubCategory Product
 categoryRoute.get("/subcategory/:subCategoryId", fetchProductBySubCategory);
+categoryRoute.get("/category/:CategoryId", fetchProductByCategory);
 
 // GetSubcategoryParameters
 categoryRoute.get(

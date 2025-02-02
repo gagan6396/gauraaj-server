@@ -529,6 +529,28 @@ const fetchProductBySubCategory = async (req: Request, res: Response) => {
 
   return apiResponse(res, 200, true, "Products fetched successfully", products);
 };
+const fetchProductByCategory = async (req: Request, res: Response) => {
+  const { CategoryId } = req.params;
+
+  if (!mongoose.isValidObjectId(CategoryId)) {
+    return apiResponse(res, 400, false, "Invalid subcategory id");
+  }
+
+  const products = await productModel.find({
+    category_id: CategoryId,
+  });
+
+  if (products.length === 0) {
+    return apiResponse(
+      res,
+      404,
+      false,
+      "No products found for this subcategory"
+    );
+  }
+
+  return apiResponse(res, 200, true, "Products fetched successfully", products);
+};
 
 export const getSubcategorySkuParameters = async (
   req: Request,
@@ -690,8 +712,7 @@ export {
   createSubCategory,
   deleteCategory,
   deleteSubCategory,
-  fetchCategoryById,
-  fetchProductBySubCategory,
+  fetchCategoryById, fetchProductByCategory, fetchProductBySubCategory,
   fetchSubCategoryById,
   getAllCategory,
   subCategoryFetching,
