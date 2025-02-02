@@ -9,7 +9,6 @@ export interface ICategory extends Document {
   status: boolean;
   slug: string;
   skuParameters?: string[];
-  
   createdAt: Date;
   updatedAt: Date;
 }

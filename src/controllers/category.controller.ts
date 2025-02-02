@@ -653,11 +653,8 @@ const updateSubCategory = async (req: Request, res: Response) => {
       return apiResponse(res, 400, false, "'data' field is required");
     }
 
-    // Check if 'images' field exists and handle it
-    if (req.body.imageUrls && Array.isArray(req.body.imageUrls)) {
-      updateData.images = req.body.imageUrls; // Update images if provided
-    } else if (req.body.imageUrl) {
-      updateData.images = [req.body.imageUrl]; // Handle single image
+    if (req.body.imageUrls.length !== 0) {
+      updateData.images = req.body.imageUrls;
     }
 
     console.log("Update Data before applying:", updateData);
