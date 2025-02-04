@@ -168,7 +168,8 @@ const updateProductBySupplier = async (req: any, res: Response) => {
   try {
     const supplierId = req?.user?.id;
     const { productId } = req.params;
-    const updateData = req.body;
+    
+    let updateData: { [key: string]: any } = req.body;
 
     // Validate productId
     if (!productId) {
@@ -193,7 +194,7 @@ const updateProductBySupplier = async (req: any, res: Response) => {
     }
 
     // Prepare update data
-    let updateData: { [key: string]: any } = {};
+    updateData = {}; // Reinitialize `updateData` if necessary
 
     // Extract and parse additional data from 'data'
     if (req.body.data) {
@@ -272,6 +273,7 @@ const updateProductBySupplier = async (req: any, res: Response) => {
     return apiResponse(res, 500, false, "Internal server error");
   }
 };
+
 
 const getAllSupplierProducts = async (req: any, res: Response) => {
   try {
