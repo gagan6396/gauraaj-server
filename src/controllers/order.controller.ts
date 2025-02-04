@@ -124,11 +124,136 @@ import apiResponse from "../utils/ApiResponse";
 //   }
 // };
 
+// const createOrder = async (req: Request, res: Response) => {
+//   try {
+//     const { userId, products, shippingAddressId, payment_id, addressSnapshot } =
+//       req.body;
+
+//     if (
+//       !userId ||
+//       !products ||
+//       !shippingAddressId ||
+//       !payment_id ||
+//       !addressSnapshot
+//     ) {
+//       return apiResponse(res, 400, false, "All fields are Required");
+//     }
+
+//     if (!mongoose.Types.ObjectId.isValid(userId)) {
+//       return apiResponse(res, 400, false, "Invalid User ID");
+//     }
+
+//     if (!mongoose.Types.ObjectId.isValid(shippingAddressId)) {
+//       return apiResponse(res, 400, false, "Invalid Shipping Address ID");
+//     }
+
+//     if (!Array.isArray(products) || products.length === 0) {
+//       return apiResponse(res, 400, false, "Products are empty");
+//     }
+
+//     let totalAmount = 0;
+//     const updatedProducts = [];
+
+//     for (const item of products) {
+//       const { productId, quantity } = item;
+
+//       if (!productId || !quantity) {
+//         return apiResponse(res, 400, false, "Invalid product or quantity.");
+//       }
+
+//       const productDetails = await productModel.findById(productId);
+//       if (!productDetails) {
+//         return apiResponse(res, 404, false, "Product not found");
+//       }
+
+//       if (productDetails.stock < quantity) {
+//         return apiResponse(
+//           res,
+//           400,
+//           false,
+//           `Insufficient stock for product "${productDetails.name}". Available stock: ${productDetails.stock}.`
+//         );
+//       }
+
+//       productDetails.stock -= quantity;
+//       await productDetails.save();
+
+//       // Calculate price with discount and tax
+//       const discountAmount =
+//         (productDetails.price * (item.discount || 0)) / 100;
+//       const priceAfterDiscount = productDetails.price - discountAmount;
+//       const taxAmount = (priceAfterDiscount * (item.tax || 0)) / 100;
+//       const finalPricePerProduct = priceAfterDiscount + taxAmount;
+
+//       // Add the total for this product without rounding it off
+//       totalAmount += finalPricePerProduct * quantity;
+
+//       // Include product dimensions (length, width, height, weight) to the updated products
+//       updatedProducts.push({
+//         productId: productId.toString(), // Convert ObjectId to string
+//         quantity,
+//         selling_price: productDetails.price,
+//         name: productDetails.name,
+//         sku: productDetails.sku,
+//         discount: item.discount || 0,
+//         tax: item.tax || 0,
+//         dimensions: productDetails.dimensions, // Ensure dimensions are included here
+//       });
+//     }
+
+//     // Create the Order
+//     const newOrder = new orderModel({
+//       user_id: new mongoose.Types.ObjectId(userId),
+//       orderDate: new Date(),
+//       totalAmount, // No rounding here
+//       orderStatus: "Pending",
+//       products: updatedProducts,
+//       shippingAddressId: new mongoose.Types.ObjectId(shippingAddressId),
+//       payment_id: new mongoose.Types.ObjectId(payment_id),
+//     });
+
+//     const savedOrder = await newOrder.save();
+
+//     // Create ShipRocket Order using extracted dimensions
+//     const response = await createShipRocketOrder({
+//       orderId: savedOrder._id.toString(),
+//       products: updatedProducts,
+//       addressSnapshot,
+//     });
+
+//     savedOrder.shipRocketOrderId = response.order_id;
+//     await savedOrder.save();
+
+//     const shippingRecord = new ShippingModel({
+//       userId: new mongoose.Types.ObjectId(userId),
+//       orderId: savedOrder._id,
+//       profileId: new mongoose.Types.ObjectId(shippingAddressId),
+//       addressSnapshot,
+//       shippingStatus: "Pending",
+//       estimatedDeliveryDate: new Date(
+//         new Date().setDate(new Date().getDate() + 7) // Default delivery estimate: +7 days
+//       ),
+//     });
+
+//     const savedShipping = await shippingRecord.save();
+
+//     return apiResponse(res, 200, true, "Order placed successfully", {
+//       order: savedOrder,
+//       shipping: savedShipping,
+//       shipRocket: response,
+//     });
+//   } catch (error) {
+//     console.error("Error while placing order", error);
+//     return apiResponse(res, 500, false, "Error while placing order");
+//   }
+// };
+
 const createOrder = async (req: Request, res: Response) => {
   try {
     const { userId, products, shippingAddressId, payment_id, addressSnapshot } =
       req.body;
 
+    // Validate required fields
     if (
       !userId ||
       !products ||
@@ -136,7 +261,7 @@ const createOrder = async (req: Request, res: Response) => {
       !payment_id ||
       !addressSnapshot
     ) {
-      return apiResponse(res, 400, false, "All fields are Required");
+      return apiResponse(res, 400, false, "All fields are required");
     }
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
@@ -154,9 +279,11 @@ const createOrder = async (req: Request, res: Response) => {
     let totalAmount = 0;
     const updatedProducts = [];
 
+    // Process each product in the order
     for (const item of products) {
-      const { productId, quantity } = item;
+      const { productId, quantity, skuParameters } = item;
 
+      // Validate product and quantity
       if (!productId || !quantity) {
         return apiResponse(res, 400, false, "Invalid product or quantity.");
       }
@@ -166,6 +293,7 @@ const createOrder = async (req: Request, res: Response) => {
         return apiResponse(res, 404, false, "Product not found");
       }
 
+      // Check if stock is available
       if (productDetails.stock < quantity) {
         return apiResponse(
           res,
@@ -175,6 +303,7 @@ const createOrder = async (req: Request, res: Response) => {
         );
       }
 
+      // Deduct stock after placing the order
       productDetails.stock -= quantity;
       await productDetails.save();
 
@@ -185,19 +314,20 @@ const createOrder = async (req: Request, res: Response) => {
       const taxAmount = (priceAfterDiscount * (item.tax || 0)) / 100;
       const finalPricePerProduct = priceAfterDiscount + taxAmount;
 
-      // Add the total for this product without rounding it off
+      // Add to total order amount
       totalAmount += finalPricePerProduct * quantity;
 
-      // Include product dimensions (length, width, height, weight) to the updated products
+      // Prepare product data including SKU parameters
       updatedProducts.push({
-        productId: productId.toString(), // Convert ObjectId to string
+        productId: productId.toString(),
         quantity,
         selling_price: productDetails.price,
         name: productDetails.name,
         sku: productDetails.sku,
         discount: item.discount || 0,
         tax: item.tax || 0,
-        dimensions: productDetails.dimensions, // Ensure dimensions are included here
+        dimensions: productDetails.dimensions,
+        skuParameters: skuParameters || {}, // Include SKU parameters (if any)
       });
     }
 
@@ -205,7 +335,7 @@ const createOrder = async (req: Request, res: Response) => {
     const newOrder = new orderModel({
       user_id: new mongoose.Types.ObjectId(userId),
       orderDate: new Date(),
-      totalAmount, // No rounding here
+      totalAmount, // Use the calculated total amount
       orderStatus: "Pending",
       products: updatedProducts,
       shippingAddressId: new mongoose.Types.ObjectId(shippingAddressId),
@@ -214,9 +344,9 @@ const createOrder = async (req: Request, res: Response) => {
 
     const savedOrder = await newOrder.save();
 
-    // Create ShipRocket Order using extracted dimensions
+    // Create ShipRocket Order using extracted dimensions and SKU parameters
     const response = await createShipRocketOrder({
-      orderId: savedOrder._id.toString(), 
+      orderId: savedOrder._id.toString(),
       products: updatedProducts,
       addressSnapshot,
     });
@@ -224,6 +354,7 @@ const createOrder = async (req: Request, res: Response) => {
     savedOrder.shipRocketOrderId = response.order_id;
     await savedOrder.save();
 
+    // Create shipping record for this order
     const shippingRecord = new ShippingModel({
       userId: new mongoose.Types.ObjectId(userId),
       orderId: savedOrder._id,
@@ -231,12 +362,13 @@ const createOrder = async (req: Request, res: Response) => {
       addressSnapshot,
       shippingStatus: "Pending",
       estimatedDeliveryDate: new Date(
-        new Date().setDate(new Date().getDate() + 7) // Default delivery estimate: +7 days
+        new Date().setDate(new Date().getDate() + 7) // Set estimated delivery date to 7 days from today
       ),
     });
 
     const savedShipping = await shippingRecord.save();
 
+    // Return response with order and shipping details
     return apiResponse(res, 200, true, "Order placed successfully", {
       order: savedOrder,
       shipping: savedShipping,
@@ -763,7 +895,7 @@ const returnOrder = async (req: Request, res: Response) => {
         name: p.productId,
         sku: p.productId,
         units: p.quantity,
-        selling_price: "1200", 
+        selling_price: "1200",
       })),
       payment_method: data.payment_method,
       sub_total: data.total,
@@ -789,6 +921,10 @@ const returnOrder = async (req: Request, res: Response) => {
 };
 
 export {
-  cancelOrder, createOrder, exchangeOrder, getOrderById, returnOrder, trackOrder
+  cancelOrder,
+  createOrder,
+  exchangeOrder,
+  getOrderById,
+  returnOrder,
+  trackOrder,
 };
-
