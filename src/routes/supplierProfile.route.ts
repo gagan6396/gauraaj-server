@@ -3,28 +3,17 @@ import {
   getSupplierProfile,
   updateSupplierProfile,
 } from "../controllers/supplierProfile.controller";
+import authMiddleware from "../middlewares/authMiddleware";
 import handleImageUpload from "../middlewares/imageMiddleware";
-import validateRequest from "../middlewares/validateSchema";
-import {
-  supplierIdParamSchema,
-  updateSupplierProfileSchema,
-} from "../Schema/supplierProfile.schema";
 
 const supplierProfileRoute = Router();
 
 // Define here the profile Routes
-supplierProfileRoute.get(
-  "/:supplierId",
-  // validateRequest({ params: supplierIdParamSchema }),
-  getSupplierProfile
-);
+supplierProfileRoute.get("/", authMiddleware, getSupplierProfile);
 supplierProfileRoute.patch(
-  "/:supplierId",
+  "/",
+  authMiddleware,
   handleImageUpload,
-  // validateRequest({
-  //   params: supplierIdParamSchema,
-  //   body: updateSupplierProfileSchema,
-  // }),
   updateSupplierProfile
 );
 

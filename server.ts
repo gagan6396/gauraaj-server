@@ -1,5 +1,5 @@
-import mongoose from "mongoose";
 import dotenv from "dotenv";
+import mongoose from "mongoose";
 import app from "./src/app";
 import { connectRedis } from "./src/config/redisClient";
 

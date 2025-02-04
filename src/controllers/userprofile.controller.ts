@@ -1,16 +1,14 @@
-import userModel from "../models/User.model";
-import profileModel from "../models/Profile.model";
-import apiResponse from "../utils/ApiResponse";
-import { Response, Request } from "express";
-import wishlistModel from "../models/WishList";
+import { Request, Response } from "express";
 import mongoose from "mongoose";
-import orderModel from "../models/Order.model";
+import { redisClient } from "../config/redisClient";
+import historyModel from "../models/History.model";
 import LoyaltyPointModel from "../models/LoyaltyPoint.model";
 import NotificationModel from "../models/Notification.model";
-import { triggerAsyncId } from "async_hooks";
-import historyModel from "../models/History.model";
-import { redisClient } from "../config/redisClient";
-
+import orderModel from "../models/Order.model";
+import profileModel from "../models/Profile.model";
+import userModel from "../models/User.model";
+import wishlistModel from "../models/WishList";
+import apiResponse from "../utils/ApiResponse";
 
 // User Profile Routes
 // const getUserProfile = async (req: Request, res: Response) => {
@@ -241,9 +239,9 @@ const updateUserProfile = async (req: Request, res: Response) => {
 };
 
 // User Profile Wishlist Fetch Api'
-const FetchUserWishlist = async (req: Request, res: Response) => {
+const FetchUserWishlist = async (req: any, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = req.user.id;
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return apiResponse(res, 404, false, "Invalid user id");
@@ -280,9 +278,9 @@ const FetchUserWishlist = async (req: Request, res: Response) => {
   }
 };
 
-const addProductToWishlist = async (req: Request, res: Response) => {
+const addProductToWishlist = async (req: any, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = req.user.id;
     const { productId } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
@@ -626,15 +624,16 @@ const FetchUserNotification = async (req: Request, res: Response) => {
 };
 
 export {
-  getUserProfile,
-  updateUserProfile,
-  FetchUserWishlist,
   addProductToWishlist,
-  updateUserWishlist,
   deleteProductFromWishlist,
-  getUserOrders,
-  getUserLoyaltiPoints,
-  RedeeemLoyaltiPoints,
   FetchUserNotification,
+  FetchUserWishlist,
+  getUserLoyaltiPoints,
   getUserOrderHistory,
+  getUserOrders,
+  getUserProfile,
+  RedeeemLoyaltiPoints,
+  updateUserProfile,
+  updateUserWishlist
 };
+

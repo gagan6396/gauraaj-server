@@ -1,14 +1,14 @@
-import express, { Router } from "express";
+import { Router } from "express";
 import {
+  deleteUserByAdmin,
   getAllUserByAdmin,
   updateUserProfile,
-  deleteUserByAdmin,
 } from "../controllers/adminUser.controller";
-import adminAuthMiddleware from "../middlewares/adminMiddleware";
+import authMiddleware from "../middlewares/authMiddleware";
 const adminUserRoute = Router();
 
-adminUserRoute.get("/users", adminAuthMiddleware, getAllUserByAdmin);
-adminUserRoute.put("/users/:userId", adminAuthMiddleware, updateUserProfile);
-adminUserRoute.delete("/users/:userId", adminAuthMiddleware, deleteUserByAdmin);
+adminUserRoute.get("/users", authMiddleware, getAllUserByAdmin);
+adminUserRoute.put("/users/:userId", authMiddleware, updateUserProfile);
+adminUserRoute.delete("/users/:userId", authMiddleware, deleteUserByAdmin);
 
 export default adminUserRoute;

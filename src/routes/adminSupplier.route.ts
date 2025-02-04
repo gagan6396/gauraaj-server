@@ -1,20 +1,12 @@
 import { Router } from "express";
 import {
-  getAllSuppliers,
-  deleteSupplierById,
-  updateSupplierById,
   approveSupplier,
+  deleteSupplierById,
+  getAllSuppliers,
   rejectSupplier,
+  updateSupplierById,
 } from "../controllers/adminSupplier.controller";
 import adminAuthMiddleware from "../middlewares/adminMiddleware";
-import {
-  updateSupplierSchema,
-  supplierIdParamSchema,
-  approveSupplierSchema,
-  rejectSupplierSchema,
-  deleteSupplierSchema,
-} from "../Schema/adminSupplier.schema";
-import validateRequest from "../middlewares/validateSchema";
 
 const adminSupplierRoute = Router();
 

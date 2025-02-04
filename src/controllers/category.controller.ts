@@ -1,9 +1,9 @@
-import apiResponse from "../utils/ApiResponse";
-import categoryModel, { ICategory } from "../models/Category.model";
 import { Request, Response } from "express";
 import mongoose from "mongoose";
 import slugify from "slugify";
+import categoryModel, { ICategory } from "../models/Category.model";
 import productModel from "../models/Product.model";
+import apiResponse from "../utils/ApiResponse";
 
 // Create the category
 const createCategory = async (req: Request, res: Response) => {
@@ -70,7 +70,7 @@ const createCategory = async (req: Request, res: Response) => {
 const getAllCategory = async (req: Request, res: Response) => {
   try {
     const category = await categoryModel
-      .find()
+      .find({ parentCategoryId: null })
       .populate("parentCategoryId", "name")
       .sort({ name: 1 });
 
@@ -529,6 +529,28 @@ const fetchProductBySubCategory = async (req: Request, res: Response) => {
 
   return apiResponse(res, 200, true, "Products fetched successfully", products);
 };
+const fetchProductByCategory = async (req: Request, res: Response) => {
+  const { CategoryId } = req.params;
+
+  if (!mongoose.isValidObjectId(CategoryId)) {
+    return apiResponse(res, 400, false, "Invalid subcategory id");
+  }
+
+  const products = await productModel.find({
+    category_id: CategoryId,
+  });
+
+  if (products.length === 0) {
+    return apiResponse(
+      res,
+      404,
+      false,
+      "No products found for this subcategory"
+    );
+  }
+
+  return apiResponse(res, 200, true, "Products fetched successfully", products);
+};
 
 export const getSubcategorySkuParameters = async (
   req: Request,
@@ -653,11 +675,8 @@ const updateSubCategory = async (req: Request, res: Response) => {
       return apiResponse(res, 400, false, "'data' field is required");
     }
 
-    // Check if 'images' field exists and handle it
-    if (req.body.imageUrls && Array.isArray(req.body.imageUrls)) {
-      updateData.images = req.body.imageUrls; // Update images if provided
-    } else if (req.body.imageUrl) {
-      updateData.images = [req.body.imageUrl]; // Handle single image
+    if (req.body.imageUrls.length !== 0) {
+      updateData.images = req.body.imageUrls;
     }
 
     console.log("Update Data before applying:", updateData);
@@ -690,14 +709,14 @@ const updateSubCategory = async (req: Request, res: Response) => {
 
 export {
   createCategory,
-  subCategoryFetching,
-  getAllCategory,
-  updateCategory,
-  deleteCategory,
   createSubCategory,
-  updateSubCategory,
+  deleteCategory,
   deleteSubCategory,
-  fetchCategoryById,
+  fetchCategoryById, fetchProductByCategory, fetchProductBySubCategory,
   fetchSubCategoryById,
-  fetchProductBySubCategory,
+  getAllCategory,
+  subCategoryFetching,
+  updateCategory,
+  updateSubCategory
 };
+

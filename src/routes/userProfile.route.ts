@@ -1,27 +1,18 @@
-import express, { Router } from "express";
+import { Router } from "express";
 import {
-  getUserProfile,
-  updateUserProfile,
-  FetchUserWishlist,
   addProductToWishlist,
-  updateUserWishlist,
   deleteProductFromWishlist,
-  getUserOrders,
-  getUserLoyaltiPoints,
-  RedeeemLoyaltiPoints,
   FetchUserNotification,
+  FetchUserWishlist,
+  getUserLoyaltiPoints,
   getUserOrderHistory,
+  getUserOrders,
+  getUserProfile,
+  RedeeemLoyaltiPoints,
+  updateUserProfile,
+  updateUserWishlist,
 } from "../controllers/userprofile.controller";
 import authMiddleware from "../middlewares/authMiddleware";
-import {
-  userIdParamSchema,
-  profileUpdateSchema,
-  productIdParamSchema,
-  wishlishAddSchema,
-  wishlistUpdateSchema,
-  loyaltiReedemSchema,
-} from "../Schema/userProfile.schema";
-import validateRequest from "../middlewares/validateSchema";
 
 const profileRoute = Router();
 
@@ -41,13 +32,13 @@ profileRoute.patch(
 
 // User Profile Wishlist Api's
 profileRoute.get(
-  "/:userId/wishlist",
+  "/wishlist",
   authMiddleware,
   // validateRequest({ params: userIdParamSchema }),
   FetchUserWishlist
 );
 profileRoute.post(
-  "/:userId/wishlist",
+  "/wishlist",
   authMiddleware,
   // validateRequest({ params: userIdParamSchema, body: wishlishAddSchema }),
   addProductToWishlist

@@ -1,15 +1,16 @@
-import productModel from "../models/Product.model";
-import supplierModel from "../models/Supplier.model";
-import { Response, Request } from "express";
-import apiResponse from "../utils/ApiResponse";
+import { Request, Response } from "express";
 import mongoose from "mongoose";
 import categoryModel from "../models/Category.model";
+import productModel from "../models/Product.model";
+import supplierModel from "../models/Supplier.model";
+import apiResponse from "../utils/ApiResponse";
 
 // Supplier Product Management
-const addProductBySupplier = async (req: Request, res: Response) => {
+const addProductBySupplier = async (req: any, res: Response) => {
   try {
-    const { supplierId } = req.params;
-
+    // const { supplierId } = req.params;
+    const supplierId = req?.user?.id;
+    // Validate JSON and parse it
     if (!req.body.data || typeof req.body.data !== "string") {
       return apiResponse(res, 400, false, "Invalid or missing 'data' field");
     }
@@ -163,62 +164,11 @@ const addProductBySupplier = async (req: Request, res: Response) => {
   }
 };
 
-// const updateProductBySupplier = async (req: Request, res: Response) => {
-//   try {
-//     const { supplierId } = req.params;
-//     const productId = req.body.productId;
-//     const updateData = req.body;
-
-//     if (!productId) {
-//       return apiResponse(res, 400, false, "Product ID is required");
-//     }
-
-//     const product = await productModel.findById({
-//       _id: productId,
-//     });
-
-//     if (!product) {
-//       return apiResponse(res, 404, false, "Product not found");
-//     }
-
-//     if (product.supplier_id.toString() !== supplierId) {
-//       return apiResponse(
-//         res,
-//         403,
-//         false,
-//         "Access Denied: You can only update your own products"
-//       );
-//     }
-
-//     // Handle images upload
-//     if (req.files && Array.isArray(req.files)) {
-//       const imageUrls = (req.files as any[]).map((file) => file.location);
-//       updateData.images = imageUrls; // Store image URLs
-//     }
-
-//     const updatedProduct = await productModel.findByIdAndUpdate(
-//       productId,
-//       updateData,
-//       { new: true }
-//     );
-
-//     return apiResponse(
-//       res,
-//       200,
-//       true,
-//       "Product updated successfully",
-//       updatedProduct
-//     );
-//   } catch (error) {
-//     console.error("Error updating product by supplier:", error);
-//     return apiResponse(res, 500, false, "Internal server error");
-//   }
-// };
-
-const updateProductBySupplier = async (req: Request, res: Response) => {
+const updateProductBySupplier = async (req: any, res: Response) => {
   try {
-    const { supplierId } = req.params;
-    const productId = req.body.productId;
+    const supplierId = req?.user?.id;
+    const { productId } = req.params;
+    const updateData = req.body;
 
     // Validate productId
     if (!productId) {
@@ -323,9 +273,9 @@ const updateProductBySupplier = async (req: Request, res: Response) => {
   }
 };
 
-const getAllSupplierProducts = async (req: Request, res: Response) => {
+const getAllSupplierProducts = async (req: any, res: Response) => {
   try {
-    const { supplierId } = req.params;
+    const supplierId = req?.user?.id;
 
     if (!supplierId) {
       return apiResponse(res, 400, false, "Supplier ID is required.");
@@ -355,9 +305,10 @@ const getAllSupplierProducts = async (req: Request, res: Response) => {
   }
 };
 
-const deleteProductBySupplier = async (req: Request, res: Response) => {
+const deleteProductBySupplier = async (req: any, res: Response) => {
   try {
-    const { supplierId, productId } = req.params;
+    const { productId } = req.params;
+    const supplierId = req?.user?.id;
 
     if (!supplierId || !productId) {
       return apiResponse(
@@ -392,12 +343,50 @@ const deleteProductBySupplier = async (req: Request, res: Response) => {
   }
 };
 
+const getProductById = async (req: any, res: Response) => {
+  const { productId } = req.params;
+  const supplierId = req?.user?.id;
+
+  console.log("supplierId, productId", supplierId, productId);
+  try {
+    if (!supplierId || !productId) {
+      return apiResponse(
+        res,
+        400,
+        false,
+        "Supplier ID and Product ID are required."
+      );
+    }
+
+    const product = await productModel.findOne({
+      _id: productId,
+      supplier_id: supplierId,
+    });
+
+    if (!product) {
+      return apiResponse(
+        res,
+        404,
+        false,
+        "Product not found or doesn't belong to this supplier."
+      );
+    }
+
+    return apiResponse(res, 200, true, "Product fetched successfully", product);
+  } catch (error) {
+    console.error("Error fetched product by supplier:", error);
+    return apiResponse(res, 500, false, "Internal server error");
+  }
+};
+
 // TODO: Compelete this after project complition
 const addBulkProductsBySupplier = async (req: Request, res: Response) => {};
 
 export {
   addProductBySupplier,
-  updateProductBySupplier,
-  getAllSupplierProducts,
   deleteProductBySupplier,
+  getAllSupplierProducts,
+  getProductById,
+  updateProductBySupplier
 };
+

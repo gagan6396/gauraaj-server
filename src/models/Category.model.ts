@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from "mongoose";
+import mongoose, { Document } from "mongoose";
 
 // Category interface
 export interface ICategory extends Document {
@@ -9,7 +9,6 @@ export interface ICategory extends Document {
   status: boolean;
   slug: string;
   skuParameters?: string[];
-  
   createdAt: Date;
   updatedAt: Date;
 }

@@ -1,20 +1,12 @@
-import express, { Router } from "express";
+import { Router } from "express";
 import {
-  createOrder,
-  getOrderById,
   cancelOrder,
-  returnOrder,
+  createOrder,
   exchangeOrder,
+  getOrderById,
+  returnOrder,
   trackOrder,
 } from "../controllers/order.controller";
-import validateRequest from "../middlewares/validateSchema";
-import {
-  createOrderSchema,
-  getOrderSchema,
-  cancelOrderSchema,
-  returnOrderSchema,
-  exchangeOrderSchema,
-} from "../Schema/order.schema";
 
 const orderRoute = Router();
 

@@ -1,9 +1,8 @@
-import { Request } from "express";
 import axios from "axios";
-import mongoose, { Number } from "mongoose";
-import orderModel from "../models/Order.model";
+import mongoose from "mongoose";
+import { sendMessageToKafka } from "../config/kafkaConfig";
 import shipRocketConfig from "../config/shipRocketConfig";
-import { producer, sendMessageToKafka } from "../config/kafkaConfig";
+import orderModel from "../models/Order.model";
 import productModel from "../models/Product.model";
 
 // interface ShipRocketOrderRequest {
@@ -439,9 +438,6 @@ const shipRocketReturnOrder = async (payload: any) => {
 };
 
 export {
-  createShipRocketOrder,
-  cancelShipRocketOrder,
-  returnShipRocketOrder,
-  shipRocketTrackOrder,
-  shipRocketReturnOrder
+  cancelShipRocketOrder, createShipRocketOrder, returnShipRocketOrder, shipRocketReturnOrder, shipRocketTrackOrder
 };
+

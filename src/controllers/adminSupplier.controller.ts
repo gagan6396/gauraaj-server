@@ -1,8 +1,7 @@
-import { Request, Response, RequestHandler } from "express";
-import userModel from "../models/User.model";
+import { Request, Response } from "express";
 import supplierModel from "../models/Supplier.model";
+import userModel from "../models/User.model";
 import apiResponse from "../utils/ApiResponse";
-import { triggerAsyncId } from "async_hooks";
 
 const updateSupplierById = async (req: Request, res: Response) => {
   try {
@@ -130,9 +129,6 @@ const rejectSupplier = async (req: Request, res: Response) => {
 };
 
 export {
-  getAllSuppliers,
-  updateSupplierById,
-  deleteSupplierById,
-  approveSupplier,
-  rejectSupplier,
+  approveSupplier, deleteSupplierById, getAllSuppliers, rejectSupplier, updateSupplierById
 };
+

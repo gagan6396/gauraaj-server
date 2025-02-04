@@ -1,6 +1,6 @@
-import { Request, Response, NextFunction } from "express";
-import { uploadMultipleImages } from "../utils/uploadImage"; // Assuming your file is at this location
+import { NextFunction, Request, Response } from "express";
 import apiResponse from "../utils/ApiResponse"; // Assuming this is your response handling utility
+import { uploadMultipleImages } from "../utils/uploadImage"; // Assuming your file is at this location
 
 const handleImageUpload = async (
   req: Request,

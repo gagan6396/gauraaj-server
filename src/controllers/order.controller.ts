@@ -1,19 +1,16 @@
-import orderModel from "../models/Order.model";
 import { Request, Response } from "express";
-import apiResponse from "../utils/ApiResponse";
-import productModel from "../models/Product.model";
-import PaymentModel from "../models/Payment.model";
 import mongoose from "mongoose";
+import orderModel from "../models/Order.model";
+import productModel from "../models/Product.model";
 import ShippingModel from "../models/Shipping.model";
-import { addProductBySupplier } from "./supplierProduct.controller";
 import {
-  createShipRocketOrder,
   cancelShipRocketOrder,
-  shipRocketTrackOrder,
+  createShipRocketOrder,
   getOrderDetailsFromShipRocket,
   shipRocketReturnOrder,
+  shipRocketTrackOrder,
 } from "../services/shipRocket.service";
-import { sendMessageToKafka } from "../config/kafkaConfig";
+import apiResponse from "../utils/ApiResponse";
 
 // const createOrder = async (req: Request, res: Response) => {
 //   try {
@@ -792,10 +789,6 @@ const returnOrder = async (req: Request, res: Response) => {
 };
 
 export {
-  createOrder,
-  getOrderById,
-  cancelOrder,
-  returnOrder,
-  exchangeOrder,
-  trackOrder,
+  cancelOrder, createOrder, exchangeOrder, getOrderById, returnOrder, trackOrder
 };
+

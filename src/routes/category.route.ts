@@ -1,31 +1,20 @@
 import { Router } from "express";
 import {
   createCategory,
-  getAllCategory,
-  updateCategory,
-  subCategoryFetching,
-  deleteCategory,
   createSubCategory,
-  updateSubCategory,
+  deleteCategory,
   deleteSubCategory,
   fetchCategoryById,
-  fetchSubCategoryById,
+  fetchProductByCategory,
   fetchProductBySubCategory,
+  fetchSubCategoryById,
+  getAllCategory,
   getAllSubcategories,
   getSubcategorySkuParameters,
+  subCategoryFetching,
+  updateCategory,
+  updateSubCategory,
 } from "../controllers/category.controller";
-import {
-  createCategorySchema,
-  updateCategorySchema,
-  fetchCategoryByIdSchema,
-  deleteCategorySchema,
-  createSubCategorySchema,
-  updateSubCategorySchema,
-  deleteSubCategorySchema,
-  fetchSubCategoryByIdSchema,
-  fetchProductBySubCategorySchema,
-} from "../Schema/category.schema";
-import validateRequest from "../middlewares/validateSchema";
 import handleImageUpload from "../middlewares/imageMiddleware";
 
 const categoryRoute = Router();
@@ -61,6 +50,7 @@ categoryRoute.delete(
 
 // SubCategory Product
 categoryRoute.get("/subcategory/:subCategoryId", fetchProductBySubCategory);
+categoryRoute.get("/category/:CategoryId", fetchProductByCategory);
 
 // GetSubcategoryParameters
 categoryRoute.get(

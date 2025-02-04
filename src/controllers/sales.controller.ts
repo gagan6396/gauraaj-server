@@ -1,9 +1,9 @@
-import { Request, Response } from "express";
-import apiResponse from "../utils/ApiResponse";
-import SalesTeamModel from "../models/SalesTeam.model";
 import bcrypt from "bcrypt";
-import { generateToken } from "../utils/jwtHelper";
+import { Request, Response } from "express";
+import SalesTeamModel from "../models/SalesTeam.model";
+import apiResponse from "../utils/ApiResponse";
 import { sendOtpEmail } from "../utils/EmailHelper";
+import { generateToken } from "../utils/jwtHelper";
 
 const registerSalesMember = async (req: Request, res: Response) => {
   try {
@@ -323,13 +323,7 @@ const getPerformanceMetrics = async (req: Request, res: Response) => {
 
 
 export {
-  registerSalesMember,
-  loginSalesMember,
-  logOut,
-  forgotPasswordSalesMember,
-  resetSalesMemberPassword,
-  getAssignedTerritories,
-  getSalesMemberProfile,
-  updateSalesMemberProfile,
-  getPerformanceMetrics,
+  forgotPasswordSalesMember, getAssignedTerritories, getPerformanceMetrics, getSalesMemberProfile, loginSalesMember,
+  logOut, registerSalesMember, resetSalesMemberPassword, updateSalesMemberProfile
 };
+

@@ -1,13 +1,11 @@
-import supplierModel from "../models/Supplier.model";
-import { Response, Request } from "express";
-import apiResponse from "../utils/ApiResponse";
 import bcrypt from "bcrypt";
+import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import adminModel from "../models/Admin.model";
+import supplierModel from "../models/Supplier.model";
+import apiResponse from "../utils/ApiResponse";
 import { sendEmailToAdmins } from "../utils/EmailSend";
 import { generateToken } from "../utils/jwtHelper";
-import { sendOtpEmail } from "../utils/EmailHelper";
-import { hash } from "crypto";
 
 const saltRounds = 10;
 
@@ -334,8 +332,6 @@ const supplierLogOut = async (req: Request, res: Response) => {
 };
 
 export {
-  registerSupplier,
-  loginSupplier,
-  supplierResetPassword,
-  supplierLogOut,
+  loginSupplier, registerSupplier, supplierLogOut, supplierResetPassword
 };
+

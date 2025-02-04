@@ -1,25 +1,19 @@
 import { Router } from "express";
-import adminAuthMiddleware from "../middlewares/adminMiddleware";
 import {
-  getAllSalesTeamMember,
-  getSalesTeamMemberById,
-  updateSalesTeamMember,
-  deleteSalesTeamMember,
-  updateSalesPerformance,
-  assignSalesTarget,
-  getSalesTeamLeaderboard,
   assignRoleToSalesMember,
+  assignSalesTarget,
   assignTerritoryToSalesMember,
+  deleteSalesTeamMember,
+  getAllSalesTeamMember,
+  getSalesTeamLeaderboard,
+  getSalesTeamMemberById,
   getTeamOverview,
   updatedPerformanceMetrics,
+  updateSalesPerformance,
+  updateSalesTeamMember,
 } from "../controllers/adminSalesTeam.controller";
+import adminAuthMiddleware from "../middlewares/adminMiddleware";
 import authMiddleware from "../middlewares/authMiddleware";
-import validateRequest from "../middlewares/validateSchema";
-import {
-  updateSalesPerformanceSchema,
-  assignSalesTargetSchema,
-  adminSalesTeamValidationSchemas,
-} from "../Schema/adminSales.schema";
 import adminSupplierRoute from "./adminSupplier.route";
 
 const adminSalesTeamRoute = Router();

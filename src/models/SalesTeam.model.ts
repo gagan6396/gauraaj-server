@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from "mongoose";
+import mongoose, { Document, Schema } from "mongoose";
 
 // Interface defining the SalesTeam document structure
 export interface SalesTeam extends Document {

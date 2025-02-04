@@ -1,12 +1,12 @@
-import supplierModel from "../models/Supplier.model";
-import { Response, Request } from "express";
-import apiResponse from "../utils/ApiResponse";
+import { Response } from "express";
 import { redisClient } from "../config/redisClient";
+import supplierModel from "../models/Supplier.model";
+import apiResponse from "../utils/ApiResponse";
 
 // Supplier Profile managment Controller
-const getSupplierProfile = async (req: Request, res: Response) => {
+const getSupplierProfile = async (req: any, res: Response) => {
   try {
-    const { supplierId } = req.params;
+    const supplierId = req?.user?.id;
 
     if (!supplierId) {
       return apiResponse(res, 400, false, "Supplier ID is required");
@@ -30,8 +30,10 @@ const getSupplierProfile = async (req: Request, res: Response) => {
     const supplier = await supplierModel
       .findById(supplierId)
       .select("-password")
-      .populate("products")
-      .populate("orders")
+      .select("-products")
+      .select("-orders")
+      // .populate("products")
+      // .populate("orders")
       .exec();
 
     if (!supplier) {
@@ -55,9 +57,9 @@ const getSupplierProfile = async (req: Request, res: Response) => {
   }
 };
 
-const updateSupplierProfile = async (req: Request, res: Response) => {
+const updateSupplierProfile = async (req: any, res: Response) => {
   try {
-    const { supplierId } = req.params;
+    const supplierId = req?.user?.id;
     const { username, email, phone, shop_name, shop_address, imageUrls } =
       req.body;
 
@@ -131,3 +133,4 @@ const updateSupplierProfile = async (req: Request, res: Response) => {
 };
 
 export { getSupplierProfile, updateSupplierProfile };
+
