@@ -5,6 +5,7 @@ export interface Cart extends Document {
   products: {
     productId: mongoose.Types.ObjectId;
     quantity: number;
+    skuParameters?: Record<string, string>;
   }[];
   createdAt: Date;
   updatedAt: Date;
@@ -29,6 +30,11 @@ const CartSchema: Schema<Cart> = new Schema(
           type: Number,
           required: true,
           min: [1, "Quantity must be at least 1"],
+        },
+        skuParameters: {
+          type: Map,
+          of: String,
+          default: {},
         },
       },
     ],
