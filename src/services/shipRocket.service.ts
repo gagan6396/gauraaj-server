@@ -47,6 +47,7 @@ interface ShipRocketOrderRequest {
       height: number;
       weight: number;
     };
+    skuParameters?: Record<string, any>;
   }[];
   addressSnapshot: {
     addressLine1: string;
@@ -99,6 +100,143 @@ export const getShipRocketToken = async (): Promise<string> => {
     throw new Error("Failed to authenticate with ShipRocket.");
   }
 };
+
+// const createShipRocketOrder = async (
+//   orderData: ShipRocketOrderRequest
+// ): Promise<any> => {
+//   try {
+//     const { orderId, products, addressSnapshot } = orderData;
+
+//     console.log("Creating order for", orderId);
+
+//     if (!orderId || !products || !addressSnapshot) {
+//       throw new Error("Required fields are missing in the request.");
+//     }
+
+//     if (!isValidObjectId(orderId)) {
+//       throw new Error(`Invalid order ID: ${orderId}`);
+//     }
+
+//     const order = await orderModel
+//       .findById(new mongoose.Types.ObjectId(orderId)) // Instantiate ObjectId with 'new'
+//       .populate("user_id", "first_name last_name email phone");
+
+//     if (!order) {
+//       throw new Error(`Order with ID ${orderId} not found.`);
+//     }
+
+//     if (!Array.isArray(products) || products.length === 0) {
+//       throw new Error("No valid products provided for the order.");
+//     }
+
+//     // Initialize total order dimensions and subtotal
+//     let totalDimensions = { length: 0, width: 0, height: 0, weight: 0 };
+//     let sub_total = 0;
+
+//     // Loop through products to ensure correct price formatting and dimension handling
+//     const updatedProducts = await Promise.all(
+//       products.map(async (product) => {
+//         const productDetails = await productModel.findById(product.productId);
+//         if (!productDetails) {
+//           throw new Error(`Product with ID ${product.productId} not found.`);
+//         }
+
+//         // Ensure the selling price is an integer (but we will not round it off)
+//         const sellingPrice = parseFloat(
+//           product.selling_price?.toString() || "0"
+//         );
+
+//         // Extract product dimensions and weight
+//         const productDimensions = productDetails.dimensions || {};
+//         totalDimensions.length += productDimensions.length || 0;
+//         totalDimensions.width += productDimensions.width || 0;
+//         totalDimensions.height += productDimensions.height || 0;
+//         totalDimensions.weight +=
+//           (productDetails.weight || 0) * product.quantity;
+
+//         sub_total += product.quantity * sellingPrice;
+
+//         return {
+//           productId: product.productId.toString(),
+//           quantity: product.quantity,
+//           selling_price: sellingPrice, // Ensure this is kept as it is, no rounding
+//           name: productDetails.name,
+//           sku: productDetails.sku,
+//           discount: product.discount || 0,
+//           tax: product.tax || 0,
+//           dimensions: productDimensions, // Ensure dimensions are included here
+//         };
+//       })
+//     );
+
+//     // Pass the sub_total as is, without rounding
+//     // Prepare the request body for the ShipRocket API
+//     const requestBody = {
+//       order_id: order._id.toString(),
+//       order_date: new Date().toISOString(),
+//       payment_method: "Prepaid",
+//       sub_total,
+//       shipping_is_billing: true,
+//       billing_customer_name: order.user_id.first_name,
+//       billing_last_name: order.user_id.last_name || "",
+//       billing_address: addressSnapshot.addressLine1,
+//       billing_city: addressSnapshot.city,
+//       billing_state: addressSnapshot.state || "Jodhpur",
+//       billing_country: addressSnapshot.country || "India",
+//       billing_phone: order.user_id.phone || "1234567890",
+//       billing_pincode: addressSnapshot.postalCode,
+//       order_items: updatedProducts.map((product) => ({
+//         name: product.name || "Default Product Name",
+//         sku: product.sku || "DEFAULT-SKU",
+//         units: product.quantity,
+//         selling_price: product.selling_price || 0,
+//         discount: product.discount || 0,
+//         tax: product.tax || 0,
+//       })),
+//       length: totalDimensions.length || 10,
+//       breadth: totalDimensions.width || 5,
+//       height: totalDimensions.height || 8,
+//       weight: totalDimensions.weight || 2,
+//     };
+
+//     // Get ShipRocket Token and send the request to ShipRocket API
+//     const token = await getShipRocketToken();
+
+//     const response = await axios.post(
+//       `${shipRocketConfig.baseUrl}/v1/external/orders/create/adhoc`,
+//       requestBody,
+//       {
+//         headers: {
+//           Authorization: `Bearer ${token}`,
+//           "Content-Type": "application/json",
+//         },
+//       }
+//     );
+
+//     // Publish Event to Kafka (Order Created)
+//     await sendMessageToKafka("shiprocket.orders", {
+//       event: "order_created",
+//       orderId: orderId,
+//       response: response.data,
+//     });
+
+//     return response.data;
+//   } catch (error: any) {
+//     console.error(
+//       "Error creating order in ShipRocket:",
+//       error.response?.data || error.message
+//     );
+
+//     // Publish Event to Kafka (Order Creation Failed)
+//     await sendMessageToKafka("shiprocket.orders", {
+//       event: "order_creation_failed",
+//       orderId: orderData.orderId,
+//       error: error.message,
+//     });
+
+//     throw new Error("Failed to create order in ShipRocket.");
+//   }
+// };
 
 const createShipRocketOrder = async (
   orderData: ShipRocketOrderRequest
@@ -164,6 +302,7 @@ const createShipRocketOrder = async (
           discount: product.discount || 0,
           tax: product.tax || 0,
           dimensions: productDimensions, // Ensure dimensions are included here
+          skuParameters: product.skuParameters || {}, // Added skuParameters here
         };
       })
     );
@@ -191,6 +330,7 @@ const createShipRocketOrder = async (
         selling_price: product.selling_price || 0,
         discount: product.discount || 0,
         tax: product.tax || 0,
+        sku_parameters: product.skuParameters, // Pass skuParameters here
       })),
       length: totalDimensions.length || 10,
       breadth: totalDimensions.width || 5,
@@ -438,6 +578,9 @@ const shipRocketReturnOrder = async (payload: any) => {
 };
 
 export {
-  cancelShipRocketOrder, createShipRocketOrder, returnShipRocketOrder, shipRocketReturnOrder, shipRocketTrackOrder
+  cancelShipRocketOrder,
+  createShipRocketOrder,
+  returnShipRocketOrder,
+  shipRocketReturnOrder,
+  shipRocketTrackOrder,
 };
-

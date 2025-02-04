@@ -1,5 +1,6 @@
 import mongoose, { Document, Schema } from "mongoose";
 
+// Define Order interface extending Document
 export interface Order extends Document {
   user_id: mongoose.Types.ObjectId;
   orderDate: Date;
@@ -15,27 +16,28 @@ export interface Order extends Document {
     | "Shipped"
     | "Delivered"
     | "Cancelled"
-    | "Returned"; 
+    | "Returned";
   products: {
     productId: mongoose.Types.ObjectId;
     quantity: number;
+    skuParameters?: Record<string, string>; 
   }[];
   shipRocketOrderId?: number;
   shippingAddressId: mongoose.Types.ObjectId;
   payment_id: mongoose.Types.ObjectId;
 }
 
-// Order Schema
+// Order Schema definition
 const OrderSchema: Schema<Order> = new Schema(
   {
     user_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "User", // Refers to the User model
       required: true,
     },
     orderDate: {
       type: Date,
-      default: Date.now,
+      default: Date.now, // Default to current date
     },
     totalAmount: {
       type: Number,
@@ -51,24 +53,28 @@ const OrderSchema: Schema<Order> = new Schema(
         "Cancelled",
         "Return Requested",
       ],
-      default: "Pending",
+      default: "Pending", // Default to "Pending"
     },
     shippingStatus: {
       type: String,
-      enum: ["Pending", "Shipped", "Delivered", "Cancelled", "Returned"], // Added `Returned`
-      default: "Pending",
+      enum: ["Pending", "Shipped", "Delivered", "Cancelled", "Returned"],
+      default: "Pending", // Default to "Pending"
     },
     products: [
       {
         productId: {
           type: mongoose.Schema.Types.ObjectId,
-          ref: "Product",
+          ref: "Product", // Refers to the Product model
           required: true,
         },
         quantity: {
           type: Number,
           required: true,
-          min: [1, "Quantity must be at least 1"],
+          min: [1, "Quantity must be at least 1"], // Ensure quantity is at least 1
+        },
+        skuParameters: {
+          type: Map,
+          of: String, // SKU parameters will be stored as a Map of strings
         },
       },
     ],
@@ -78,20 +84,20 @@ const OrderSchema: Schema<Order> = new Schema(
     },
     shippingAddressId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Profile",
+      ref: "Profile", // Refers to the Profile model for the shipping address
       required: true,
     },
     payment_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Payment",
+      ref: "Payment", // Refers to the Payment model
     },
   },
   {
-    timestamps: true,
+    timestamps: true, // Automatically add createdAt and updatedAt fields
   }
 );
 
-// Order Model
+// Create or use the existing Order model
 const orderModel =
   mongoose.models.Order || mongoose.model<Order>("Order", OrderSchema);
 

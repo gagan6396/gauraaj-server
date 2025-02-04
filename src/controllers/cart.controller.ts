@@ -31,7 +31,7 @@ const getUserCart = async (req: Request, res: Response) => {
 const addProductToCart = async (req: Request, res: Response) => {
   try {
     const { productId } = req.params;
-    const { userId, quantity } = req.body;
+    const { userId, quantity, skuParameters } = req.body;
 
     // Validate productId and userId
     if (!mongoose.Types.ObjectId.isValid(productId)) {
@@ -59,8 +59,34 @@ const addProductToCart = async (req: Request, res: Response) => {
       return apiResponse(res, 404, false, "Product not found.");
     }
 
-    if (product.stock < parsedQuantity) {
-      return apiResponse(res, 400, false, "Not enough stock for this product.");
+    // Validate SKU parameters
+    if (skuParameters) {
+      const skuParams = product.skuParameters || {};
+      for (const [param, value] of Object.entries(skuParameters)) {
+        if (!skuParams.has(param) || !skuParams.get(param).includes(value)) {
+          return apiResponse(
+            res,
+            400,
+            false,
+            `Invalid value for ${param}: ${value}`
+          );
+        }
+      }
+    }
+
+    // Check stock based on SKU parameters
+    // This assumes that `product.skuParameters` has stock management for variants.
+    const selectedVariant = `${product.sku}-${JSON.stringify(skuParameters)}`;
+    if (
+      !product.stock[selectedVariant] ||
+      product.stock[selectedVariant] < parsedQuantity
+    ) {
+      return apiResponse(
+        res,
+        400,
+        false,
+        `Not enough stock for the selected variant.`
+      );
     }
 
     // Check if cart exists for user
@@ -74,9 +100,11 @@ const addProductToCart = async (req: Request, res: Response) => {
       });
     }
 
-    // Check if the product is already in the cart
+    // Check if the product with specific SKU parameters is already in the cart
     const productInCart = cart.products.find(
-      (item: any) => item.productId.toString() === productId
+      (item: any) =>
+        item.productId.toString() === productId &&
+        JSON.stringify(item.skuParameters) === JSON.stringify(skuParameters)
     );
 
     if (productInCart) {
@@ -84,19 +112,20 @@ const addProductToCart = async (req: Request, res: Response) => {
       productInCart.quantity += parsedQuantity;
 
       // Check if the new quantity exceeds stock
-      if (productInCart.quantity > product.stock) {
+      if (productInCart.quantity > product.stock[selectedVariant]) {
         return apiResponse(
           res,
           400,
           false,
-          `Insufficient stock. Available stock: ${product.stock}`
+          `Insufficient stock for the selected variant. Available stock: ${product.stock[selectedVariant]}`
         );
       }
     } else {
-      // Add the product to the cart if it doesn't already exist
+      // Add the product with SKU parameters to the cart if it doesn't already exist
       cart.products.push({
         productId: new mongoose.Types.ObjectId(productId),
         quantity: parsedQuantity,
+        skuParameters: skuParameters,
       });
     }
 
@@ -120,7 +149,7 @@ const addProductToCart = async (req: Request, res: Response) => {
 const updateCart = async (req: Request, res: Response) => {
   try {
     const { productId } = req.params;
-    const { userId, quantity } = req.body;
+    const { userId, quantity, skuParameters } = req.body;
 
     // Validate inputs
     if (!mongoose.Types.ObjectId.isValid(productId)) {
@@ -135,42 +164,86 @@ const updateCart = async (req: Request, res: Response) => {
       return apiResponse(res, 400, false, "Quantity must be zero or greater.");
     }
 
+    // Validate SKU parameters
+    if (!skuParameters || typeof skuParameters !== "object") {
+      return apiResponse(res, 400, false, "Invalid SKU parameters.");
+    }
+
+    // Retrieve the cart for the user
     const cart = await CartModel.findOne({ userId });
     if (!cart) {
       return apiResponse(res, 404, false, "Cart not found.");
     }
 
-    const productInCart = cart.products.find(
-      (item: any) => item.productId.toString() === productId
+    // Check if the product already exists in the cart
+    let productInCart = cart.products.find(
+      (item: any) =>
+        item.productId.toString() === productId &&
+        JSON.stringify(item.skuParameters) === JSON.stringify(skuParameters)
     );
 
+    // If product with SKU parameters not found, check if SKU is changing
     if (!productInCart) {
-      return apiResponse(res, 404, false, "Product not found in cart.");
-    }
-
-    if (quantity === 0) {
-      cart.products = cart.products.filter(
-        (item: any) => item.productId.toString() !== productId
+      // If SKU parameters are different, we need to remove the old one and add the new one
+      const oldProductInCart = cart.products.find(
+        (item: any) => item.productId.toString() === productId
       );
-    } else {
-      const productDetails = await productModel.findById(productId);
-      if (!productDetails) {
-        return apiResponse(res, 404, false, "Product not found.");
-      }
 
-      if (productDetails.stock < quantity) {
-        return apiResponse(
-          res,
-          400,
-          false,
-          `Insufficient stock. Available stock: ${productDetails.stock}`
+      // If an old product is found, remove it and treat the new SKU as a different variant
+      if (oldProductInCart) {
+        cart.products = cart.products.filter(
+          (item: any) =>
+            item.productId.toString() !== productId ||
+            JSON.stringify(item.skuParameters) !==
+              JSON.stringify(oldProductInCart.skuParameters)
         );
       }
 
-      // Update the quantity in the cart
-      productInCart.quantity = quantity;
+      // Add the new SKU product to the cart
+      productInCart = {
+        productId,
+        quantity,
+        skuParameters,
+      };
+      cart.products.push(productInCart);
     }
 
+    // Fetch product details to check stock
+    const productDetails = await productModel.findById(productId);
+    if (!productDetails) {
+      return apiResponse(res, 404, false, "Product not found.");
+    }
+
+    // Check if stock is available for the updated SKU (if SKU is changed or quantity is updated)
+    const availableStock = productDetails.skus?.[JSON.stringify(skuParameters)];
+    if (!availableStock || availableStock < quantity) {
+      return apiResponse(
+        res,
+        400,
+        false,
+        `Insufficient stock for the selected SKU. Available stock: ${availableStock}`
+      );
+    }
+
+    // Update the quantity if it's an existing SKU
+    if (productInCart) {
+      if (quantity === 0) {
+        // If quantity is 0, remove the product
+        cart.products = cart.products.filter(
+          (item: any) =>
+            !(
+              item.productId.toString() === productId &&
+              JSON.stringify(item.skuParameters) ===
+                JSON.stringify(skuParameters)
+            )
+        );
+      } else {
+        // Update the quantity for the product in the cart
+        productInCart.quantity = quantity;
+      }
+    }
+
+    // Save the updated cart
     await cart.save();
 
     return apiResponse(res, 200, true, "Cart updated successfully.", cart);

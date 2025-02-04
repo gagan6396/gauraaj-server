@@ -168,20 +168,22 @@ const updateProductBySupplier = async (req: any, res: Response) => {
   try {
     const supplierId = req?.user?.id;
     const { productId } = req.params;
-    const updateData = req.body;
+    
+    let updateData: { [key: string]: any } = req.body;
 
+    // Validate productId
     if (!productId) {
       return apiResponse(res, 400, false, "Product ID is required");
     }
 
-    const product = await productModel.findById({
-      _id: productId,
-    });
+    // Find the product
+    const product = await productModel.findById(productId);
 
     if (!product) {
       return apiResponse(res, 404, false, "Product not found");
     }
 
+    // Check if the product belongs to the supplier
     if (product.supplier_id.toString() !== supplierId) {
       return apiResponse(
         res,
@@ -191,17 +193,73 @@ const updateProductBySupplier = async (req: any, res: Response) => {
       );
     }
 
-    // Handle images upload
-    if (req.files && Array.isArray(req.files)) {
-      const imageUrls = (req.files as any[]).map((file) => file.location);
-      updateData.images = imageUrls; // Store image URLs
+    // Prepare update data
+    updateData = {}; // Reinitialize `updateData` if necessary
+
+    // Extract and parse additional data from 'data'
+    if (req.body.data) {
+      try {
+        const parsedData = JSON.parse(req.body.data);
+
+        // Update basic fields
+        updateData.name = parsedData.name || product.name;
+        updateData.description = parsedData.description || product.description;
+        updateData.price = parsedData.price || product.price;
+        updateData.stock = parsedData.stock || product.stock;
+        updateData.category_id = parsedData.category_id || product.category_id;
+        updateData.subcategory_id =
+          parsedData.subcategory_id || product.subcategory_id;
+
+        // Update SKU parameters
+        updateData.skuParameters =
+          parsedData.skuParameters || product.skuParameters;
+
+        // Update brand, weight, and dimensions
+        updateData.brand = parsedData.brand || product.brand;
+        updateData.weight = parsedData.weight || product.weight;
+        updateData.dimensions = parsedData.dimensions || product.dimensions;
+
+        // Update SKU
+        updateData.sku = parsedData.sku || product.sku;
+
+        // Handle imageUrls update
+        if (
+          parsedData.imageUrls &&
+          Array.isArray(parsedData.imageUrls) &&
+          parsedData.imageUrls.length > 0
+        ) {
+          updateData.images = parsedData.imageUrls; // Update with new image URLs
+        } else {
+          updateData.images = product.images; // Preserve existing images
+        }
+      } catch (error) {
+        return apiResponse(
+          res,
+          400,
+          false,
+          "Invalid data format in 'data' field"
+        );
+      }
     }
 
+    // Handle uploaded images (if files are present in form-data)
+    if (req.files && Array.isArray(req.files)) {
+      const uploadedImageUrls = (req.files as any[]).map(
+        (file) => file.location
+      );
+      updateData.images = uploadedImageUrls; // Overwrite with uploaded images
+    }
+
+    // Update the product
     const updatedProduct = await productModel.findByIdAndUpdate(
       productId,
-      updateData,
-      { new: true }
+      { $set: updateData },
+      { new: true, runValidators: true }
     );
+
+    if (!updatedProduct) {
+      return apiResponse(res, 404, false, "Failed to update product");
+    }
 
     return apiResponse(
       res,
@@ -215,6 +273,7 @@ const updateProductBySupplier = async (req: any, res: Response) => {
     return apiResponse(res, 500, false, "Internal server error");
   }
 };
+
 
 const getAllSupplierProducts = async (req: any, res: Response) => {
   try {

@@ -8,7 +8,8 @@ import { generateToken } from "../utils/jwtHelper";
 
 const RegisterUser = async (req: Request, res: Response) => {
   try {
-    const { first_name, last_name, email, phone, password } = req.body;
+    const { first_name, last_name, email, phone, password, googleId } =
+      req.body;
 
     // Validate input fields
     if (!first_name || !last_name || !email || !password || !phone) {
