@@ -1,14 +1,11 @@
-import { Request, Response } from "express";
-import apiResponse from "../utils/ApiResponse";
+import { Response } from "express";
 import CartModel from "../models/Cart.model";
 import couponModel from "../models/Coupon.model";
-import OrderModel from "../models/Order.model";
-import ProductModel from "../models/Product.model";
-import mongoose from "mongoose";
+import apiResponse from "../utils/ApiResponse";
 
-export const validateCart = async (req: Request, res: Response) => {
+export const validateCart = async (req: any, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = req?.user?.id;
 
     const cart = await CartModel.findOne({ userId }).populate(
       "products.productId"
@@ -40,10 +37,10 @@ export const validateCart = async (req: Request, res: Response) => {
   }
 };
 
-export const applyCoupon = async (req: Request, res: Response) => {
+export const applyCoupon = async (req: any, res: Response) => {
   try {
     const { code } = req.body;
-    const { userId } = req.params;
+    const userId = req?.user?.id;
 
     const coupon = await couponModel.findOne({ code, isActive: true });
     if (!coupon) {
@@ -98,9 +95,9 @@ export const applyCoupon = async (req: Request, res: Response) => {
   }
 };
 
-export const reviewOrder = async (req: Request, res: Response) => {
+export const reviewOrder = async (req: any, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = req?.user?.id;
 
     const cart = await CartModel.findOne({ userId }).populate(
       "products.productId"

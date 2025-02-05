@@ -1,12 +1,12 @@
-import CartModel from "../models/Cart.model";
-import { Request, Response } from "express";
-import apiResponse from "../utils/ApiResponse";
+import { Response } from "express";
 import mongoose from "mongoose";
+import CartModel from "../models/Cart.model";
 import productModel from "../models/Product.model";
+import apiResponse from "../utils/ApiResponse";
 
-const getUserCart = async (req: Request, res: Response) => {
+const getUserCart = async (req: any, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = req.user.id;
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return apiResponse(res, 400, false, "Invalid user ID.");
@@ -28,10 +28,11 @@ const getUserCart = async (req: Request, res: Response) => {
   }
 };
 
-const addProductToCart = async (req: Request, res: Response) => {
+const addProductToCart = async (req: any, res: Response) => {
   try {
     const { productId } = req.params;
-    const { userId, quantity, skuParameters } = req.body;
+    const { quantity, skuParameters } = req.body;
+    const userId = req.user.id;
 
     // Validate productId and userId
     if (!mongoose.Types.ObjectId.isValid(productId)) {
@@ -146,10 +147,11 @@ const addProductToCart = async (req: Request, res: Response) => {
   }
 };
 
-const updateCart = async (req: Request, res: Response) => {
+const updateCart = async (req: any, res: Response) => {
   try {
     const { productId } = req.params;
-    const { userId, quantity, skuParameters } = req.body;
+    const { quantity, skuParameters } = req.body;
+    const userId = req.user.id;
 
     // Validate inputs
     if (!mongoose.Types.ObjectId.isValid(productId)) {
@@ -253,10 +255,10 @@ const updateCart = async (req: Request, res: Response) => {
   }
 };
 
-const deleteProductFromCart = async (req: Request, res: Response) => {
+const deleteProductFromCart = async (req: any, res: Response) => {
   try {
     const { productId } = req.params;
-    const { userId } = req.body;
+    const userId = req.user.id;
 
     if (!mongoose.Types.ObjectId.isValid(productId)) {
       return apiResponse(res, 400, false, "Invalid product ID.");
@@ -295,4 +297,5 @@ const deleteProductFromCart = async (req: Request, res: Response) => {
   }
 };
 
-export { getUserCart, addProductToCart, updateCart, deleteProductFromCart };
+export { addProductToCart, deleteProductFromCart, getUserCart, updateCart };
+

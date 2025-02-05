@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 import mongoose from "mongoose";
 import { redisClient } from "../config/redisClient";
 import historyModel from "../models/History.model";
@@ -10,62 +10,9 @@ import userModel from "../models/User.model";
 import wishlistModel from "../models/WishList";
 import apiResponse from "../utils/ApiResponse";
 
-// User Profile Routes
-// const getUserProfile = async (req: Request, res: Response) => {
-//   try {
-//     const { userId } = req.params;
-
-//     if (!userId) {
-//       return apiResponse(res, 400, false, "Please provide a userId");
-//     }
-
-//     // Find user by userId
-//     const user = await userModel.findById(userId);
-//     if (!user) {
-//       return apiResponse(res, 404, false, "User not found");
-//     }
-
-//     // Fetch the profile using the user's ID
-//     const profileExist = await profileModel.findOne({ user_id: user._id });
-
-//     if (!profileExist) {
-//       return apiResponse(
-//         res,
-//         404,
-//         false,
-//         "Profile not found. Please create one."
-//       );
-//     }
-
-//     // Safely combine user and profile data
-//     const userProfile = {
-//       first_name: user.first_name,
-//       last_name: user.last_name,
-//       email: user.email,
-//       phone: user.phone,
-//       role: user.role,
-//       profileImage: profileExist.profileImage || "",
-//       shoppingAddress: profileExist.shoppingAddress || [],
-//       orderList: profileExist.orderList || [],
-//       wishList: profileExist.wishList || [],
-//     };
-
-//     return apiResponse(
-//       res,
-//       200,
-//       true,
-//       "User profile fetched successfully",
-//       userProfile
-//     );
-//   } catch (error) {
-//     console.error("Error while fetching user profile", error);
-//     return apiResponse(res, 500, false, "Internal server error");
-//   }
-// };
-
-const getUserProfile = async (req: Request, res: Response) => {
+const getUserProfile = async (req: any, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = req?.user?.id;
 
     if (!userId) {
       return apiResponse(res, 400, false, "Please provide a userId");
@@ -145,9 +92,9 @@ const getUserProfile = async (req: Request, res: Response) => {
 };
 
 // UpdateUserProfile
-const updateUserProfile = async (req: Request, res: Response) => {
+const updateUserProfile = async (req: any, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = req?.user?.id;
     if (!userId) {
       return apiResponse(res, 400, false, "Please provide a userId");
     }
@@ -329,9 +276,9 @@ const addProductToWishlist = async (req: any, res: Response) => {
   }
 };
 
-const updateUserWishlist = async (req: Request, res: Response) => {
+const updateUserWishlist = async (req: any, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = req?.user?.id;
     const { productIds } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
@@ -386,10 +333,10 @@ const updateUserWishlist = async (req: Request, res: Response) => {
 };
 
 // delete product from wishlist
-const deleteProductFromWishlist = async (req: Request, res: Response) => {
+const deleteProductFromWishlist = async (req: any, res: Response) => {
   try {
-    const { userId, productId } = req.params;
-
+    const { productId } = req.params;
+    const userId = req?.user?.id;
     if (
       !mongoose.Types.ObjectId.isValid(userId) ||
       !mongoose.Types.ObjectId.isValid(productId)
@@ -435,9 +382,9 @@ const deleteProductFromWishlist = async (req: Request, res: Response) => {
 };
 
 // get user's current order
-const getUserOrders = async (req: Request, res: Response) => {
+const getUserOrders = async (req: any, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = req?.user?.id;
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return apiResponse(res, 400, false, "Invalid user ID");
@@ -468,9 +415,9 @@ const getUserOrders = async (req: Request, res: Response) => {
 };
 
 // Get the user orderHistory
-const getUserOrderHistory = async (req: Request, res: Response) => {
+const getUserOrderHistory = async (req: any, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = req?.user?.id;
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return apiResponse(res, 400, false, "Invalid user ID");
     }
@@ -501,9 +448,9 @@ const getUserOrderHistory = async (req: Request, res: Response) => {
 };
 
 // get userLoyaltiPoints
-const getUserLoyaltiPoints = async (req: Request, res: Response) => {
+const getUserLoyaltiPoints = async (req: any, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = req?.user?.id;
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return apiResponse(res, 400, false, "Invalid user ID");
@@ -536,9 +483,9 @@ const getUserLoyaltiPoints = async (req: Request, res: Response) => {
 };
 
 // Redeem loyalti Points
-const RedeeemLoyaltiPoints = async (req: Request, res: Response) => {
+const RedeeemLoyaltiPoints = async (req: any, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = req?.user?.id;
     const { PointsToRedeem, description } = req.body;
 
     // Data Validation
@@ -588,9 +535,9 @@ const RedeeemLoyaltiPoints = async (req: Request, res: Response) => {
 };
 
 // Fetch the notifiction for User
-const FetchUserNotification = async (req: Request, res: Response) => {
+const FetchUserNotification = async (req: any, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = req?.user?.id;
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return apiResponse(res, 400, false, "Invalid user ID");
     }

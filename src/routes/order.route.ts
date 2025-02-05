@@ -7,32 +7,16 @@ import {
   returnOrder,
   trackOrder,
 } from "../controllers/order.controller";
+import authMiddleware from "../middlewares/authMiddleware";
 
 const orderRoute = Router();
 
 // Define here all Order Routes
-orderRoute.post("/", createOrder);
-orderRoute.get(
-  "/:orderId",
-  // validateRequest({ params: getOrderSchema, body: getOrderSchema }),
-  getOrderById
-);
-orderRoute.post(
-  "/:orderId/cancel",
-  // validateRequest({ params: cancelOrderSchema, body: cancelOrderSchema }),
-  cancelOrder
-);
-orderRoute.post(
-  "/:orderId/return",
-  // validateRequest({ params: returnOrderSchema, body: returnOrderSchema }),
-  returnOrder
-);
-orderRoute.post(
-  "/:orderId/exchange",
-  // validateRequest({ params: exchangeOrderSchema, body: exchangeOrderSchema }),
-  exchangeOrder
-);
-
-orderRoute.get("/track/:orderId", trackOrder);
+orderRoute.post("/", authMiddleware, createOrder);
+orderRoute.get("/:orderId", authMiddleware, getOrderById);
+orderRoute.post("/:orderId/cancel", authMiddleware, cancelOrder);
+orderRoute.post("/:orderId/return", authMiddleware, returnOrder);
+orderRoute.post("/:orderId/exchange", authMiddleware, exchangeOrder);
+orderRoute.get("/track/:orderId", authMiddleware, trackOrder);
 
 export default orderRoute;
