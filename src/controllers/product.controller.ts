@@ -1,5 +1,5 @@
-import productModel from "../models/Product.model";
 import { Request, Response } from "express";
+import productModel from "../models/Product.model";
 import apiResponse from "../utils/ApiResponse";
 
 const getAllProducts = async (req: Request, res: Response) => {
@@ -109,7 +109,6 @@ const getProductById = async (req: Request, res: Response) => {
       })
       .populate({
         path: "subcategory_id",
-        select: "name description image slug",
       })
       .populate({
         path: "reviews",
@@ -325,4 +324,5 @@ const filterProduct = async (req: Request, res: Response) => {
   }
 };
 
-export { getAllProducts, getProductById, searchProduct, filterProduct };
+export { filterProduct, getAllProducts, getProductById, searchProduct };
+
