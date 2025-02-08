@@ -91,6 +91,7 @@ const getProductById = async (req: Request, res: Response) => {
         description: 1,
         price: 1,
         stock: 1,
+        skuParameters: 1,
         images: 1,
         rating: 1,
         color: 1,
@@ -109,6 +110,7 @@ const getProductById = async (req: Request, res: Response) => {
       })
       .populate({
         path: "subcategory_id",
+        select: "name description image slug",
       })
       .populate({
         path: "reviews",
