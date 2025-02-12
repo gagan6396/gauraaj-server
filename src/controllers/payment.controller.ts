@@ -1,9 +1,9 @@
-import PaymentModel from "../models/Payment.model";
-import Razorpay from "razorpay";
-import apiResponse from "../utils/ApiResponse";
-import { Request, Response } from "express";
 import crypto from "crypto";
 import dotenv from "dotenv";
+import { Request, Response } from "express";
+import Razorpay from "razorpay";
+import PaymentModel from "../models/Payment.model";
+import apiResponse from "../utils/ApiResponse";
 
 dotenv.config();
 
@@ -11,44 +11,6 @@ const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID as string,
   key_secret: process.env.RAZORPAY_KEY_SECRET as string,
 });
-
-// Create a Razorpay Order and store Payment details
-// const createOrder = async (req: Request, res: Response) => {
-//   try {
-//     const { userId, orderId, paymentMethod, amount } = req.body;
-
-//     if (!userId || !orderId || !paymentMethod || !amount) {
-//       return apiResponse(res, 400, false, "Missing required fields");
-//     }
-
-//     const options = {
-//       amount: parseFloat(amount) * 100, // Razorpay requires amount in paise
-//       currency: "INR",
-//       receipt: `receipt_${Math.random().toString(36).substring(7)}`,
-//     };
-
-//     const razorpayOrder = await razorpay.orders.create(options);
-
-//     const payment = new PaymentModel({
-//       userId,
-//       orderId,
-//       paymentMethod,
-//       transactionId: razorpayOrder.id,
-//       amount,
-//       status: "Pending",
-//     });
-
-//     await payment.save();
-
-//     return apiResponse(res, 200, true, "Order created successfully", {
-//       razorpayOrder,
-//       payment,
-//     });
-//   } catch (error) {
-//     console.error("Error creating order for Razorpay", error);
-//     return apiResponse(res, 500, false, "Internal Server Error");
-//   }
-// };
 
 const createOrder = async (req: Request, res: Response) => {
   try {
@@ -94,7 +56,6 @@ const createOrder = async (req: Request, res: Response) => {
     return apiResponse(res, 500, false, "Internal Server Error");
   }
 };
-
 
 // Verify Razorpay Payment
 const verifyPayment = async (req: Request, res: Response) => {
@@ -233,13 +194,7 @@ const getPaymentHistory = async (req: Request, res: Response) => {
   }
 };
 
-
 export {
-  createOrder,
-  verifyPayment,
-  getPaymentDetailsById,
-  initiateRefund,
-  getPaymentHistory,
+  createOrder, getPaymentDetailsById, getPaymentHistory, initiateRefund, verifyPayment
 };
-
 
