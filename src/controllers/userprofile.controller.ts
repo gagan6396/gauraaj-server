@@ -28,16 +28,16 @@ const getUserProfile = async (req: any, res: Response) => {
     const cacheKey = `user:profile:${userId}`;
     console.log("fetchign profile for cacheKey", cacheKey);
     const cachedProfile = await redisClient.get(cacheKey);
-    if (cachedProfile) {
-      console.log("Serving user profile from cache");
-      return apiResponse(
-        res,
-        200,
-        true,
-        "User profile fetched successfully (from cache)",
-        JSON.parse(cachedProfile)
-      );
-    }
+    // if (cachedProfile) {
+    //   console.log("Serving user profile from cache");
+    //   return apiResponse(
+    //     res,
+    //     200,
+    //     true,
+    //     "User profile fetched successfully (from cache)",
+    //     JSON.parse(cachedProfile)
+    //   );
+    // }
 
     // Fetch user and profile from the database
     const user = await userModel.findById(userId);
