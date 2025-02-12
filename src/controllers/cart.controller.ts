@@ -28,10 +28,11 @@ const getUserCart = async (req: Request, res: Response) => {
   }
 };
 
-const addProductToCart = async (req: Request, res: Response) => {
+const addProductToCart = async (req: any, res: Response) => {
   try {
-    const { productId } = req.params;
-    const { userId, quantity } = req.body;
+    const userId = req?.user?.id;
+    const { productId } = req?.params;
+    const { quantity } = req?.body;
 
     // Validate productId and userId
     if (!mongoose.Types.ObjectId.isValid(productId)) {
