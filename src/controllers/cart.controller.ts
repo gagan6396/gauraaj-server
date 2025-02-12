@@ -1,12 +1,12 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 import mongoose from "mongoose";
 import CartModel from "../models/Cart.model";
 import productModel from "../models/Product.model";
 import apiResponse from "../utils/ApiResponse";
 
-const getUserCart = async (req: Request, res: Response) => {
+const getUserCart = async (req: any, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = req?.user?.id;
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return apiResponse(res, 400, false, "Invalid user ID.");
@@ -118,10 +118,11 @@ const addProductToCart = async (req: any, res: Response) => {
   }
 };
 
-const updateCart = async (req: Request, res: Response) => {
+const updateCart = async (req: any, res: Response) => {
   try {
     const { productId } = req.params;
-    const { userId, quantity } = req.body;
+    const { quantity } = req.body;
+    const userId = req?.user?.id;
 
     // Validate inputs
     if (!mongoose.Types.ObjectId.isValid(productId)) {
@@ -181,10 +182,10 @@ const updateCart = async (req: Request, res: Response) => {
   }
 };
 
-const deleteProductFromCart = async (req: Request, res: Response) => {
+const deleteProductFromCart = async (req: any, res: Response) => {
   try {
     const { productId } = req.params;
-    const { userId } = req.body;
+    const userId = req?.user?.id;
 
     if (!mongoose.Types.ObjectId.isValid(productId)) {
       return apiResponse(res, 400, false, "Invalid product ID.");
