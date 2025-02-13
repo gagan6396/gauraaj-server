@@ -50,7 +50,6 @@ const paymentSchema: Schema<Payment> = new Schema(
     },
     transactionId: {
       type: String,
-      unique: true,
       required: true,
     },
     amount: {
