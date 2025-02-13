@@ -213,8 +213,6 @@ const createOrder = async (req: any, res: Response) => {
   }
 };
 
-export default createOrder;
-
 const getOrderById = async (req: any, res: Response) => {
   try {
     const { orderId } = req.params;

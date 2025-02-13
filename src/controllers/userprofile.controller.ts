@@ -57,7 +57,7 @@ const getUserProfile = async (req: any, res: Response) => {
 
     // Combine user and profile data
     const userProfile = {
-      id: user._id,
+      id: profileExist._id,
       first_name: user.first_name,
       last_name: user.last_name,
       email: user.email,
