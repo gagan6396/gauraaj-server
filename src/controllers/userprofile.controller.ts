@@ -67,6 +67,7 @@ const getUserProfile = async (req: any, res: Response) => {
       shoppingAddress: profileExist.shoppingAddress || [],
       orderList: profileExist.orderList || [],
       wishList: profileExist.wishList || [],
+      profileExist,
     };
 
     // Cache the user profile for 1 hour (3600 seconds)
