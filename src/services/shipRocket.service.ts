@@ -255,7 +255,7 @@ const createShipRocketOrder = async (
     }
 
     const order = await orderModel
-      .findById(new mongoose.Types.ObjectId(orderId)) // Instantiate ObjectId with 'new'
+      .findById(new mongoose.Types.ObjectId(orderId))
       .populate("user_id", "first_name last_name email phone");
 
     if (!order) {
@@ -266,11 +266,9 @@ const createShipRocketOrder = async (
       throw new Error("No valid products provided for the order.");
     }
 
-    // Initialize total order dimensions and subtotal
     let totalDimensions = { length: 0, width: 0, height: 0, weight: 0 };
     let sub_total = 0;
 
-    // Loop through products to ensure correct price formatting and dimension handling
     const updatedProducts = await Promise.all(
       products.map(async (product) => {
         const productDetails = await productModel.findById(product.productId);
@@ -278,12 +276,10 @@ const createShipRocketOrder = async (
           throw new Error(`Product with ID ${product.productId} not found.`);
         }
 
-        // Ensure the selling price is an integer (but we will not round it off)
         const sellingPrice = parseFloat(
           product.selling_price?.toString() || "0"
         );
 
-        // Extract product dimensions and weight
         const productDimensions = productDetails.dimensions || {};
         totalDimensions.length += productDimensions.length || 0;
         totalDimensions.width += productDimensions.width || 0;
@@ -296,19 +292,17 @@ const createShipRocketOrder = async (
         return {
           productId: product.productId.toString(),
           quantity: product.quantity,
-          selling_price: sellingPrice, // Ensure this is kept as it is, no rounding
+          selling_price: sellingPrice,
           name: productDetails.name,
           sku: productDetails.sku,
           discount: product.discount || 0,
           tax: product.tax || 0,
-          dimensions: productDimensions, // Ensure dimensions are included here
-          skuParameters: product.skuParameters || {}, // Added skuParameters here
+          dimensions: productDimensions,
+          skuParameters: product.skuParameters || {},
         };
       })
     );
 
-    // Pass the sub_total as is, without rounding
-    // Prepare the request body for the ShipRocket API
     const requestBody = {
       order_id: order._id.toString(),
       order_date: new Date().toISOString(),
@@ -330,7 +324,7 @@ const createShipRocketOrder = async (
         selling_price: product.selling_price || 0,
         discount: product.discount || 0,
         tax: product.tax || 0,
-        sku_parameters: product.skuParameters, // Pass skuParameters here
+        sku_parameters: product.skuParameters,
       })),
       length: totalDimensions.length || 10,
       breadth: totalDimensions.width || 5,
@@ -338,8 +332,10 @@ const createShipRocketOrder = async (
       weight: totalDimensions.weight || 2,
     };
 
-    // Get ShipRocket Token and send the request to ShipRocket API
+    console.log("ShipRocket Request Payload:", requestBody);
+
     const token = await getShipRocketToken();
+    console.log("ShipRocket Token:", token);
 
     const response = await axios.post(
       `${shipRocketConfig.baseUrl}/v1/external/orders/create/adhoc`,
@@ -352,7 +348,8 @@ const createShipRocketOrder = async (
       }
     );
 
-    // Publish Event to Kafka (Order Created)
+    console.log("ShipRocket Response:", response.data);
+
     await sendMessageToKafka("shiprocket.orders", {
       event: "order_created",
       orderId: orderId,
@@ -366,14 +363,15 @@ const createShipRocketOrder = async (
       error.response?.data || error.message
     );
 
-    // Publish Event to Kafka (Order Creation Failed)
     await sendMessageToKafka("shiprocket.orders", {
       event: "order_creation_failed",
       orderId: orderData.orderId,
-      error: error.message,
+      error: error.response?.data || error.message,
     });
 
-    throw new Error("Failed to create order in ShipRocket.");
+    throw new Error(
+      `Failed to create order in ShipRocket: ${error.response?.data || error.message}`
+    );
   }
 };
 
@@ -582,5 +580,6 @@ export {
   createShipRocketOrder,
   returnShipRocketOrder,
   shipRocketReturnOrder,
-  shipRocketTrackOrder,
+  shipRocketTrackOrder
 };
+
