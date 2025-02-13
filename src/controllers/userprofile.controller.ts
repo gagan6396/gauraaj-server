@@ -57,7 +57,7 @@ const getUserProfile = async (req: any, res: Response) => {
 
     // Combine user and profile data
     const userProfile = {
-      id: profileExist._id,
+      _id: profileExist._id,
       first_name: user.first_name,
       last_name: user.last_name,
       email: user.email,
@@ -67,7 +67,6 @@ const getUserProfile = async (req: any, res: Response) => {
       shoppingAddress: profileExist.shoppingAddress || [],
       orderList: profileExist.orderList || [],
       wishList: profileExist.wishList || [],
-      profileExist,
     };
 
     // Cache the user profile for 1 hour (3600 seconds)
