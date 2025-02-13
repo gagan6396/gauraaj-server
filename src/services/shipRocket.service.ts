@@ -254,6 +254,11 @@ const createShipRocketOrder = async (
       throw new Error(`Invalid order ID: ${orderId}`);
     }
 
+    // Validate addressSnapshot
+    if (!addressSnapshot.addressLine1 || !addressSnapshot.postalCode) {
+      throw new Error("Address snapshot is missing required fields: addressLine1 or postalCode.");
+    }
+
     const order = await orderModel
       .findById(new mongoose.Types.ObjectId(orderId))
       .populate("user_id", "first_name last_name email phone");
@@ -311,12 +316,12 @@ const createShipRocketOrder = async (
       shipping_is_billing: true,
       billing_customer_name: order.user_id.first_name,
       billing_last_name: order.user_id.last_name || "",
-      billing_address: addressSnapshot.addressLine1,
+      billing_address: addressSnapshot.addressLine1, // Fixed: Use addressLine1
       billing_city: addressSnapshot.city,
       billing_state: addressSnapshot.state || "Jodhpur",
       billing_country: addressSnapshot.country || "India",
       billing_phone: order.user_id.phone || "1234567890",
-      billing_pincode: addressSnapshot.postalCode,
+      billing_pincode: addressSnapshot.postalCode, // Fixed: Use postalCode
       order_items: updatedProducts.map((product) => ({
         name: product.name || "Default Product Name",
         sku: product.sku || "DEFAULT-SKU",
