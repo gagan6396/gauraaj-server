@@ -122,8 +122,8 @@ const createShippingRecord = async (
 
 // Main controller for creating an order
 const createOrder = async (req: any, res: Response) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  // const session = await mongoose.startSession();
+  // session.startTransaction();
 
   try {
     const userId = req?.user?.id;
@@ -156,7 +156,8 @@ const createOrder = async (req: any, res: Response) => {
       amount: totalAmount,
       status: "Pending",
     });
-    await payment.save({ session });
+    // await payment.save({ session });
+    await payment.save();
 
     // Create the order
     const newOrder = new orderModel({
@@ -168,7 +169,8 @@ const createOrder = async (req: any, res: Response) => {
       shippingAddressId: new mongoose.Types.ObjectId(shippingAddressId),
       payment_id: payment._id,
     });
-    const savedOrder = await newOrder.save({ session });
+    // const savedOrder = await newOrder.save({ session });
+    const savedOrder = await newOrder.save();
 
     // Create ShipRocket order
     const shipRocketResponse = await createShipRocketOrder({
@@ -177,7 +179,8 @@ const createOrder = async (req: any, res: Response) => {
       addressSnapshot,
     });
     savedOrder.shipRocketOrderId = shipRocketResponse.order_id;
-    await savedOrder.save({ session });
+    // await savedOrder.save({ session });
+    await savedOrder.save();
 
     // Create shipping record
     const savedShipping = await createShippingRecord(
@@ -188,8 +191,8 @@ const createOrder = async (req: any, res: Response) => {
     );
 
     // Commit the transaction
-    await session.commitTransaction();
-    session.endSession();
+    // await session.commitTransaction();
+    // session.endSession();
 
     // Return success response
     return apiResponse(res, 200, true, "Order placed successfully", {
@@ -200,8 +203,8 @@ const createOrder = async (req: any, res: Response) => {
     });
   } catch (error: any) {
     // Rollback the transaction on error
-    await session.abortTransaction();
-    session.endSession();
+    // await session.abortTransaction();
+    // session.endSession();
 
     console.error("Error while placing order:", error);
     return apiResponse(
