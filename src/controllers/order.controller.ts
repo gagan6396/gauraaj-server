@@ -122,9 +122,6 @@ const createShippingRecord = async (
 
 // Main controller for creating an order
 const createOrder = async (req: any, res: Response) => {
-  // const session = await mongoose.startSession();
-  // session.startTransaction();
-
   try {
     const userId = req?.user?.id;
     const { products, shippingAddressId, paymentMethod, addressSnapshot } =
@@ -150,13 +147,11 @@ const createOrder = async (req: any, res: Response) => {
     // Create payment record
     const payment = new PaymentModel({
       userId,
-      orderId: razorpayOrder?.id || "COD", // Use Razorpay order ID or "COD"
       paymentMethod,
       transactionId: razorpayOrder?.id || "COD",
       amount: totalAmount,
-      status: "Pending",
+      status: paymentMethod === "Razorpay" ? "Pending" : "COD",
     });
-    // await payment.save({ session });
     await payment.save();
 
     // Create the order
@@ -169,8 +164,11 @@ const createOrder = async (req: any, res: Response) => {
       shippingAddressId: new mongoose.Types.ObjectId(shippingAddressId),
       payment_id: payment._id,
     });
-    // const savedOrder = await newOrder.save({ session });
     const savedOrder = await newOrder.save();
+
+    // Update payment with order ID
+    payment.orderId = savedOrder._id;
+    await payment.save();
 
     // Create ShipRocket order
     const shipRocketResponse = await createShipRocketOrder({
@@ -179,7 +177,6 @@ const createOrder = async (req: any, res: Response) => {
       addressSnapshot,
     });
     savedOrder.shipRocketOrderId = shipRocketResponse.order_id;
-    // await savedOrder.save({ session });
     await savedOrder.save();
 
     // Create shipping record
@@ -190,10 +187,6 @@ const createOrder = async (req: any, res: Response) => {
       addressSnapshot
     );
 
-    // Commit the transaction
-    // await session.commitTransaction();
-    // session.endSession();
-
     // Return success response
     return apiResponse(res, 200, true, "Order placed successfully", {
       order: savedOrder,
@@ -202,10 +195,6 @@ const createOrder = async (req: any, res: Response) => {
       razorpayOrder,
     });
   } catch (error: any) {
-    // Rollback the transaction on error
-    // await session.abortTransaction();
-    // session.endSession();
-
     console.error("Error while placing order:", error);
     return apiResponse(
       res,

@@ -2,7 +2,7 @@ import mongoose, { Document, Model, Schema } from "mongoose";
 
 export interface Payment extends Document {
   userId: mongoose.Types.ObjectId;
-  orderId: string;
+  orderId: mongoose.Types.ObjectId;
   paymentMethod:
     | "UPI"
     | "COD"
@@ -32,8 +32,8 @@ const paymentSchema: Schema<Payment> = new Schema(
       required: true,
     },
     orderId: {
-      type: String, // Change this to String
-      required: true,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Order",
     },
     paymentMethod: {
       type: String,

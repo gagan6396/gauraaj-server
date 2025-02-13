@@ -1,12 +1,12 @@
-import express, { Router } from "express";
-import authMiddleware from "../middlewares/authMiddleware";
+import { Router } from "express";
 import {
   createOrder,
-  verifyPayment,
   getPaymentDetailsById,
-  initiateRefund,
   getPaymentHistory,
+  initiateRefund,
+  verifyPayment,
 } from "../controllers/payment.controller";
+import authMiddleware from "../middlewares/authMiddleware";
 
 const paymentRoute = Router();
 
