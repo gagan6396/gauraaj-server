@@ -150,7 +150,7 @@ const createOrder = async (req: any, res: Response) => {
       paymentMethod,
       transactionId: razorpayOrder?.id || "COD",
       amount: totalAmount,
-      status: paymentMethod === "Razorpay" ? "Pending" : "COD",
+      status: "Pending",
     });
     await payment.save();
 
