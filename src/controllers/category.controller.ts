@@ -308,7 +308,7 @@ const createSubCategory = async (req: Request, res: Response) => {
       slug,
       images, // Save the validated image URLs
       parentCategoryId: categoryId,
-      skuParameters: skuParameters || parentCategory.skuParameters, // Inherit from parent if not provided
+      // skuParameters: skuParameters || parentCategory.skuParameters, // Inherit from parent if not provided
     });
 
     await newSubCategory.save();
@@ -513,7 +513,7 @@ const updateSubCategory = async (req: Request, res: Response) => {
 
         updateData.name = parsedData.name || undefined;
         updateData.description = parsedData.description || undefined;
-        updateData.skuParameters = parsedData.skuParameters || undefined;
+        // updateData.skuParameters = parsedData.skuParameters || undefined;
 
         if (updateData.name) {
           updateData.slug = slugify(updateData.name, { lower: true });

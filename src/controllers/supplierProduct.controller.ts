@@ -211,8 +211,8 @@ const updateProductBySupplier = async (req: any, res: Response) => {
           parsedData.subcategory_id || product.subcategory_id;
 
         // Update SKU parameters
-        updateData.skuParameters =
-          parsedData.skuParameters || product.skuParameters;
+        // updateData.skuParameters =
+        //   parsedData.skuParameters || product.skuParameters;
 
         // Update brand, weight, and dimensions
         updateData.brand = parsedData.brand || product.brand;
