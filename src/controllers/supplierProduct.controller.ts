@@ -5,6 +5,20 @@ import productModel from "../models/Product.model";
 import supplierModel from "../models/Supplier.model";
 import apiResponse from "../utils/ApiResponse";
 
+interface UpdateProductData {
+  name?: string;
+  description?: string;
+  price?: number;
+  stock?: number;
+  category_id?: string;
+  subcategory_id?: string;
+  brand?: string;
+  weight?: number;
+  dimensions?: string;
+  sku?: string;
+  images?: string[];
+}
+
 // Supplier Product Management
 const addProductBySupplier = async (req: any, res: Response) => {
   try {
@@ -169,29 +183,15 @@ const updateProductBySupplier = async (req: any, res: Response) => {
     const supplierId = req?.user?.id;
     const { productId } = req.params;
 
-    let updateData: { [key: string]: any } = {};
-
-    // Ensure image URLs are added from the upload middleware
-    let imageUrls: string[] = [];
-    if (req.body.imageUrls && Array.isArray(req.body.imageUrls)) {
-      imageUrls = req.body.imageUrls;
-    } else if (req.body.imageUrl) {
-      imageUrls = [req.body.imageUrl];
-    }
-
-    // Validate productId
     if (!productId) {
       return apiResponse(res, 400, false, "Product ID is required");
     }
 
-    // Find the product
     const product = await productModel.findById(productId);
-
     if (!product) {
       return apiResponse(res, 404, false, "Product not found");
     }
 
-    // Check if the product belongs to the supplier
     if (product.supplier_id.toString() !== supplierId) {
       return apiResponse(
         res,
@@ -201,43 +201,47 @@ const updateProductBySupplier = async (req: any, res: Response) => {
       );
     }
 
-    // Extract and parse additional data from 'data'
+    let updateData: UpdateProductData = {};
+    let imageUrls: string[] = [];
+
+    // Handle image URLs from request body
+    if (req.body.imageUrls && Array.isArray(req.body.imageUrls)) {
+      imageUrls = req.body.imageUrls;
+    } else if (req.body.imageUrl) {
+      imageUrls = [req.body.imageUrl];
+    }
+
+    // Parse and update product data
     if (req.body.data) {
       try {
         const parsedData = JSON.parse(req.body.data);
 
-        // Update basic fields
-        updateData.name = parsedData.name || product.name;
-        updateData.description = parsedData.description || product.description;
-        updateData.price = parsedData.price || product.price;
-        updateData.stock = parsedData.stock || product.stock;
-        updateData.category_id = parsedData.category_id || product.category_id;
-        updateData.subcategory_id =
-          parsedData.subcategory_id || product.subcategory_id;
+        updateData = {
+          name: parsedData.name || product.name,
+          description: parsedData.description || product.description,
+          price: parsedData.price || product.price,
+          stock: parsedData.stock || product.stock,
+          category_id: parsedData.category_id || product.category_id,
+          subcategory_id: parsedData.subcategory_id || product.subcategory_id,
+          brand: parsedData.brand || product.brand,
+          weight: parsedData.weight || product.weight,
+          dimensions: parsedData.dimensions || product.dimensions,
+        };
 
-        // Update brand, weight, and dimensions
-        updateData.brand = parsedData.brand || product.brand;
-        updateData.weight = parsedData.weight || product.weight;
-        updateData.dimensions = parsedData.dimensions || product.dimensions;
-
-        // Update SKU (if provided)
+        // Handle SKU uniqueness check
         if (parsedData.sku && parsedData.sku !== product.sku) {
-          // Check if the new SKU already exists in the database
           const existingProductWithSKU = await productModel.findOne({
             sku: parsedData.sku,
-            _id: { $ne: productId }, // Exclude the current product
+            _id: { $ne: productId },
           });
 
           if (existingProductWithSKU) {
-            // return apiResponse(res, 400, false, "SKU must be unique");
-          } else {
-            updateData.sku = product.sku; // Preserve existing SKU
+            return apiResponse(res, 400, false, "SKU must be unique");
           }
-
-          // updateData.sku = parsedData.sku; // Update SKU only if it's unique
+          updateData.sku = parsedData.sku;
         }
 
-        // Handle imageUrls update
+        // Combine image URLs
         updateData.images = [
           ...(Array.isArray(imageUrls) ? imageUrls : []),
           ...(Array.isArray(parsedData?.images) ? parsedData.images : []),
