@@ -222,12 +222,12 @@ const updateProductBySupplier = async (req: any, res: Response) => {
           });
 
           if (existingProductWithSKU) {
-            return apiResponse(res, 400, false, "SKU must be unique");
+            // return apiResponse(res, 400, false, "SKU must be unique");
+          } else {
+            updateData.sku = product.sku; // Preserve existing SKU
           }
 
-          updateData.sku = parsedData.sku; // Update SKU only if it's unique
-        } else {
-          updateData.sku = product.sku; // Preserve existing SKU
+          // updateData.sku = parsedData.sku; // Update SKU only if it's unique
         }
 
         // Handle imageUrls update
