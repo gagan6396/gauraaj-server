@@ -231,14 +231,21 @@ const updateProductBySupplier = async (req: any, res: Response) => {
         }
 
         // Handle imageUrls update
-        if (
-          parsedData.imageUrls &&
-          Array.isArray(parsedData.imageUrls) &&
-          parsedData.imageUrls.length > 0
-        ) {
-          updateData.images = parsedData.imageUrls; // Update with new image URLs
-        } else {
-          updateData.images = product.images; // Preserve existing images
+        if (req.files && Array.isArray(req.files)) {
+          const uploadedImageUrls = (req.files as any[]).map(
+            (file) => file.location
+          );
+
+          // Delete old images from S3 if new images are uploaded
+          if (product.images && Array.isArray(product.images)) {
+            for (const oldImage of product.images) {
+              if (!parsedData.imageUrls.includes(oldImage)) {
+                await deleteImageFromS3(oldImage); // Delete images not in the updated list
+              }
+            }
+          }
+
+          updateData.images = uploadedImageUrls; // Overwrite with uploaded images
         }
       } catch (error) {
         return apiResponse(
