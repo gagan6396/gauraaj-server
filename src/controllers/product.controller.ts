@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import mongoose from "mongoose";
 import productModel from "../models/Product.model";
 import apiResponse from "../utils/ApiResponse";
 
@@ -185,10 +186,6 @@ const searchProduct = async (req: Request, res: Response) => {
     return apiResponse(res, 500, false, "Internal server error");
   }
 };
-
-// TODO: Compelete the filter API
-
-import mongoose from "mongoose"; // Import mongoose for ObjectId validation
 
 const filterProduct = async (req: Request, res: Response) => {
   try {

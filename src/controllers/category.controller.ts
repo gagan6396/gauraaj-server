@@ -66,7 +66,6 @@ const createCategory = async (req: Request, res: Response) => {
 };
 
 // Get all category
-
 const getAllCategory = async (req: Request, res: Response) => {
   try {
     const category = await categoryModel
@@ -114,98 +113,6 @@ const fetchCategoryById = async (req: Request, res: Response) => {
     return apiResponse(res, 500, false, "Internal server error");
   }
 };
-
-// const updateCategory = async (req: Request, res: Response) => {
-//   try {
-//     const { categoryId } = req.params;
-//     const updates = req.body;
-
-//     if (!mongoose.Types.ObjectId.isValid(categoryId)) {
-//       return apiResponse(res, 404, false, "Invalid Category Id");
-//     }
-
-//     const updatedCategory = await categoryModel.findByIdAndUpdate(
-//       categoryId,
-//       { $set: updates },
-//       { new: true }
-//     );
-
-//     if (!updatedCategory) {
-//       return apiResponse(res, 404, false, "Category not found");
-//     }
-
-//     return apiResponse(
-//       res,
-//       200,
-//       true,
-//       "Category Updates Successfully",
-//       updatedCategory
-//     );
-//   } catch (error) {
-//     console.error("Error while updating category", error);
-//     return apiResponse(res, 500, false, "Error while updating category");
-//   }
-// };
-
-// Update the category
-// const updateCategory = async (req: Request, res: Response) => {
-//   try {
-//     const { categoryId } = req.params;
-
-//     // Validate categoryId
-//     if (!mongoose.Types.ObjectId.isValid(categoryId)) {
-//       return apiResponse(res, 404, false, "Invalid Category Id");
-//     }
-
-//     // Initialize updates object
-//     let updates: { [key: string]: any } = {};
-
-//     // Extract and parse data from the "data" field in form-data
-//     if (req.body.data) {
-//       try {
-//         const parsedData = JSON.parse(req.body.data); // Parse JSON string
-//         updates.name = parsedData.name || undefined; // Extract name
-//         updates.description = parsedData.description || undefined; // Extract description
-
-//         if (updates.name) {
-//           updates.slug = slugify(updates.name, { lower: true });
-//         }
-//       } catch (error) {
-//         return apiResponse(
-//           res,
-//           400,
-//           false,
-//           "Invalid data format in 'data' field"
-//         );
-//       }
-//     }
-
-//     if (req.body.imageUrls) {
-//       updates.images = req.body.imageUrls;
-//     }
-
-//     const updatedCategory = await categoryModel.findByIdAndUpdate(
-//       categoryId,
-//       { $set: updates },
-//       { new: true, runValidators: true }
-//     );
-
-//     if (!updatedCategory) {
-//       return apiResponse(res, 404, false, "Category not found");
-//     }
-
-//     return apiResponse(
-//       res,
-//       200,
-//       true,
-//       "Category updated successfully",
-//       updatedCategory
-//     );
-//   } catch (error) {
-//     console.error("Error while updating category:", error);
-//     return apiResponse(res, 500, false, "Error while updating category");
-//   }
-// };
 
 const updateCategory = async (req: Request, res: Response) => {
   try {
@@ -351,55 +258,6 @@ const subCategoryFetching = async (req: Request, res: Response) => {
   }
 };
 
-// const createSubCategory = async (req: Request, res: Response) => {
-//   try {
-//     const { categoryId } = req.params; // Parent category ID (e.g., Electronics)
-//     const { name, description, image } = req.body;
-
-//     // Check if required fields are provided
-//     if (!name || !description) {
-//       return apiResponse(res, 400, false, "Name and description are required");
-//     }
-
-//     let slug = req.body.slug;
-//     if (!slug) {
-//       slug = slugify(name, { lower: true });
-//     }
-
-//     // Check if parent category exists
-//     const parentCategory = await categoryModel.findById(categoryId);
-//     if (!parentCategory) {
-//       return apiResponse(res, 404, false, "Parent category not found");
-//     }
-
-//     // Create new subcategory and link to the parent category
-//     const newSubCategory = new categoryModel({
-//       name,
-//       description,
-//       slug,
-//       image,
-//       parentCategoryId: categoryId, // Link to the parent category
-//     });
-
-//     await newSubCategory.save();
-
-//     return apiResponse(
-//       res,
-//       201,
-//       true,
-//       "Subcategory created successfully",
-//       newSubCategory
-//     );
-//   } catch (error) {
-//     console.error("Error creating subcategory:", error);
-//     return apiResponse(res, 500, false, "Internal server error");
-//   }
-// };
-
-//
-
-// SubCategory with Sku Parameters
-
 const createSubCategory = async (req: Request, res: Response) => {
   try {
     // Parse the incoming data
@@ -529,6 +387,7 @@ const fetchProductBySubCategory = async (req: Request, res: Response) => {
 
   return apiResponse(res, 200, true, "Products fetched successfully", products);
 };
+
 const fetchProductByCategory = async (req: Request, res: Response) => {
   const { CategoryId } = req.params;
 
@@ -552,10 +411,7 @@ const fetchProductByCategory = async (req: Request, res: Response) => {
   return apiResponse(res, 200, true, "Products fetched successfully", products);
 };
 
-export const getSubcategorySkuParameters = async (
-  req: Request,
-  res: Response
-) => {
+const getSubcategorySkuParameters = async (req: Request, res: Response) => {
   try {
     const { categoryId, subCategoryId } = req.params;
 
@@ -592,8 +448,7 @@ export const getSubcategorySkuParameters = async (
 };
 
 // Fetch All subCategories
-
-export const getAllSubcategories = async (req: Request, res: Response) => {
+const getAllSubcategories = async (req: Request, res: Response) => {
   try {
     const { categoryId } = req.params;
 
@@ -658,7 +513,7 @@ const updateSubCategory = async (req: Request, res: Response) => {
 
         updateData.name = parsedData.name || undefined;
         updateData.description = parsedData.description || undefined;
-        // updateData.skuParameters = parsedData.skuParameters || undefined;
+        updateData.skuParameters = parsedData.skuParameters || undefined;
 
         if (updateData.name) {
           updateData.slug = slugify(updateData.name, { lower: true });
@@ -712,10 +567,11 @@ export {
   createSubCategory,
   deleteCategory,
   deleteSubCategory,
-  fetchCategoryById, fetchProductByCategory, fetchProductBySubCategory,
+  fetchCategoryById,
+  fetchProductByCategory,
+  fetchProductBySubCategory,
   fetchSubCategoryById,
-  getAllCategory,
-  subCategoryFetching,
+  getAllCategory, getAllSubcategories, getSubcategorySkuParameters, subCategoryFetching,
   updateCategory,
   updateSubCategory
 };

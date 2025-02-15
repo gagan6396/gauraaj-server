@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 import mongoose from "mongoose";
 import categoryModel from "../models/Category.model";
 import productModel from "../models/Product.model";
@@ -168,7 +168,7 @@ const updateProductBySupplier = async (req: any, res: Response) => {
   try {
     const supplierId = req?.user?.id;
     const { productId } = req.params;
-    
+
     let updateData: { [key: string]: any } = req.body;
 
     // Validate productId
@@ -211,8 +211,8 @@ const updateProductBySupplier = async (req: any, res: Response) => {
           parsedData.subcategory_id || product.subcategory_id;
 
         // Update SKU parameters
-        // updateData.skuParameters =
-        //   parsedData.skuParameters || product.skuParameters;
+        updateData.skuParameters =
+          parsedData.skuParameters || product.skuParameters;
 
         // Update brand, weight, and dimensions
         updateData.brand = parsedData.brand || product.brand;
@@ -273,7 +273,6 @@ const updateProductBySupplier = async (req: any, res: Response) => {
     return apiResponse(res, 500, false, "Internal server error");
   }
 };
-
 
 const getAllSupplierProducts = async (req: any, res: Response) => {
   try {
@@ -380,9 +379,6 @@ const getProductById = async (req: any, res: Response) => {
     return apiResponse(res, 500, false, "Internal server error");
   }
 };
-
-// TODO: Compelete this after project complition
-const addBulkProductsBySupplier = async (req: Request, res: Response) => {};
 
 export {
   addProductBySupplier,
