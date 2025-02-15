@@ -241,7 +241,7 @@ const updateProductBySupplier = async (req: any, res: Response) => {
         // Handle imageUrls update
         updateData.images = [
           ...(Array.isArray(imageUrls) ? imageUrls : []),
-          ...(Array.isArray(product?.images) ? product.images : []),
+          ...(Array.isArray(parsedData?.images) ? parsedData.images : []),
         ];
       } catch (error) {
         return apiResponse(
