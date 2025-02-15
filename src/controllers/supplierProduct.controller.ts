@@ -213,8 +213,22 @@ const updateProductBySupplier = async (req: any, res: Response) => {
         updateData.weight = parsedData.weight || product.weight;
         updateData.dimensions = parsedData.dimensions || product.dimensions;
 
-        // Update SKU
-        updateData.sku = parsedData.sku || product.sku;
+        // Update SKU (if provided)
+        if (parsedData.sku && parsedData.sku !== product.sku) {
+          // Check if the new SKU already exists in the database
+          const existingProductWithSKU = await productModel.findOne({
+            sku: parsedData.sku,
+            _id: { $ne: productId }, // Exclude the current product
+          });
+
+          if (existingProductWithSKU) {
+            return apiResponse(res, 400, false, "SKU must be unique");
+          }
+
+          updateData.sku = parsedData.sku; // Update SKU only if it's unique
+        } else {
+          updateData.sku = product.sku; // Preserve existing SKU
+        }
 
         // Handle imageUrls update
         if (
