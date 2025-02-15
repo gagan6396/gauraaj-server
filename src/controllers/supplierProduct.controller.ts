@@ -206,8 +206,8 @@ const updateProductBySupplier = async (req: any, res: Response) => {
 
     // Handle image URLs from request body
     if (req.body.imageUrls && Array.isArray(req.body.imageUrls)) {
-      imageUrls = req.body.imageUrls;
-    } else if (req.body.imageUrl) {
+      imageUrls = req.body.imageUrls.filter((url: any) => typeof url === 'string');
+    } else if (req.body.imageUrl && typeof req.body.imageUrl === 'string') {
       imageUrls = [req.body.imageUrl];
     }
 
@@ -241,11 +241,18 @@ const updateProductBySupplier = async (req: any, res: Response) => {
           updateData.sku = parsedData.sku;
         }
 
+        // Extract URLs from oldImages if they are objects
+        const oldImageUrls = Array.isArray(parsedData?.oldImages)
+          ? parsedData.oldImages.map((img: any) => (typeof img === 'string' ? img : img.path))
+          : [];
+
         // Combine image URLs
         updateData.images = [
-          ...(Array.isArray(imageUrls) ? imageUrls : []),
-          ...(Array.isArray(parsedData?.oldImages) ? parsedData.oldImages : []),
+          ...imageUrls,
+          ...oldImageUrls,
         ];
+
+        console.log("Combined images:", updateData.images); // Debugging
       } catch (error) {
         return apiResponse(
           res,
