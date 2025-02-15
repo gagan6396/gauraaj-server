@@ -244,7 +244,7 @@ const updateProductBySupplier = async (req: any, res: Response) => {
         // Combine image URLs
         updateData.images = [
           ...(Array.isArray(imageUrls) ? imageUrls : []),
-          ...(Array.isArray(parsedData?.images) ? parsedData.images : []),
+          ...(Array.isArray(parsedData?.oldImages) ? parsedData.oldImages : []),
         ];
       } catch (error) {
         return apiResponse(
