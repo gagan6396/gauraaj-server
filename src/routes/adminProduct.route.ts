@@ -1,18 +1,11 @@
 import { Router } from "express";
 import {
-  getAllProducts,
   addNewProduct,
-  updateProductById,
   deleteProductById,
+  getAllProducts,
+  updateProductById,
 } from "../controllers/adminProduct.controller";
 import adminAuthMiddleware from "../middlewares/adminMiddleware";
-import {
-  addNewProductSchema,
-  updateProductSchema,
-  productIdParamSchema,
-  deleteProductSchema,
-} from "../Schema/adminProduct.schema";
-import validateRequest from "../middlewares/validateSchema";
 
 const adminProductRoute = Router();
 

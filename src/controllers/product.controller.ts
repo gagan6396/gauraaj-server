@@ -1,13 +1,16 @@
 import { Request, Response } from "express";
 import mongoose from "mongoose";
+import CartModel from "../models/Cart.model";
 import productModel from "../models/Product.model";
+import wishlistModel from "../models/WishList";
 import apiResponse from "../utils/ApiResponse";
 
-const getAllProducts = async (req: Request, res: Response) => {
+const getAllProducts = async (req: any, res: Response) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const skip = (page - 1) * limit;
+    const userId = req?.user?.id; // Assuming user ID is available in the request object
 
     // Fetch all products with necessary fields
     const products = await productModel
@@ -48,7 +51,27 @@ const getAllProducts = async (req: Request, res: Response) => {
         select: "rating comment user_id",
       })
       .skip(skip)
-      // .limit(limit);
+      .limit(limit);
+
+    // Fetch user's wishlist and cart
+    const wishlist = await wishlistModel.findOne({ user_id: userId });
+    const cart = await CartModel.findOne({ userId });
+
+    // Map products to include inWishlist and inCart flags
+    const productsWithFlags = products.map((product) => {
+      const inWishlist =
+        wishlist?.product_id.some((id: any) => id.equals(product._id)) || false;
+      const inCart =
+        cart?.products.some((item: any) =>
+          item.productId.equals(product._id)
+        ) || false;
+
+      return {
+        ...product.toObject(),
+        inWishlist,
+        inCart,
+      };
+    });
 
     // Count total number of products for pagination
     const totalProducts = await productModel.countDocuments();
@@ -56,12 +79,12 @@ const getAllProducts = async (req: Request, res: Response) => {
     // Calculate total pages
     const totalPages = Math.ceil(totalProducts / limit);
 
-    if (!products.length) {
+    if (!productsWithFlags.length) {
       return apiResponse(res, 404, false, "No products found");
     }
 
     return apiResponse(res, 200, true, "Products fetched successfully", {
-      products,
+      products: productsWithFlags,
       pagination: {
         totalProducts,
         totalPages,
@@ -75,17 +98,19 @@ const getAllProducts = async (req: Request, res: Response) => {
   }
 };
 
-const getProductById = async (req: Request, res: Response) => {
+const getProductById = async (req: any, res: Response) => {
   try {
     const { productId } = req.params;
+    const userId = req?.user?.id; // Assuming user ID is available in the request object
 
     if (!productId) {
       return apiResponse(res, 400, false, "ProductId is Required");
     }
 
     // Use .lean() to get a plain object
-    const product = await productModel
+    const product: any = await productModel
       .findById(productId, {
+        _id: 1,
         supplier_id: 1,
         category_id: 1,
         subcategory_id: 1,
@@ -124,12 +149,29 @@ const getProductById = async (req: Request, res: Response) => {
       return apiResponse(res, 404, false, "Product not found");
     }
 
+    // Fetch user's wishlist and cart
+    const wishlist = await wishlistModel.findOne({ user_id: userId });
+    const cart = await CartModel.findOne({ userId });
+
+    // Add inWishlist and inCart flags to the product
+    const inWishlist =
+      wishlist?.product_id.some((id: any) => id.equals(product._id)) || false;
+    const inCart =
+      cart?.products.some((item: any) => item.productId.equals(product._id)) ||
+      false;
+
+    const productWithFlags = {
+      ...product,
+      inWishlist,
+      inCart,
+    };
+
     return apiResponse(
       res,
       200,
       true,
       `Product fetched successfully: ${productId}`,
-      product
+      productWithFlags
     );
   } catch (error) {
     console.error("Error while fetching product by id", error);
