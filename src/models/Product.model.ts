@@ -110,7 +110,7 @@ const productSchema: Schema<Product> = new mongoose.Schema(
       type: String,
       required: true,
       // unique: true,
-      trim: true,
+      // trim: true,
     },
     skuParameters: {
       type: Map,
