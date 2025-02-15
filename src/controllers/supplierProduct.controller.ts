@@ -239,7 +239,10 @@ const updateProductBySupplier = async (req: any, res: Response) => {
         }
 
         // Handle imageUrls update
-        updateData.images = imageUrls; // Overwrite with uploaded images
+        updateData.images = [
+          ...(Array.isArray(imageUrls) ? imageUrls : []),
+          ...(Array.isArray(product?.images) ? product.images : []),
+        ];
       } catch (error) {
         return apiResponse(
           res,
