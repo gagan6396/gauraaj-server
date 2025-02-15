@@ -4,6 +4,7 @@ import categoryModel from "../models/Category.model";
 import productModel from "../models/Product.model";
 import supplierModel from "../models/Supplier.model";
 import apiResponse from "../utils/ApiResponse";
+import { deleteImageFromS3 } from "../utils/uploadImage";
 
 // Supplier Product Management
 const addProductBySupplier = async (req: any, res: Response) => {
@@ -169,7 +170,7 @@ const updateProductBySupplier = async (req: any, res: Response) => {
     const supplierId = req?.user?.id;
     const { productId } = req.params;
 
-    let updateData: { [key: string]: any } = req.body;
+    let updateData: { [key: string]: any } = {};
 
     // Validate productId
     if (!productId) {
@@ -193,9 +194,6 @@ const updateProductBySupplier = async (req: any, res: Response) => {
       );
     }
 
-    // Prepare update data
-    updateData = {}; // Reinitialize `updateData` if necessary
-
     // Extract and parse additional data from 'data'
     if (req.body.data) {
       try {
@@ -209,10 +207,6 @@ const updateProductBySupplier = async (req: any, res: Response) => {
         updateData.category_id = parsedData.category_id || product.category_id;
         updateData.subcategory_id =
           parsedData.subcategory_id || product.subcategory_id;
-
-        // Update SKU parameters
-        // updateData.skuParameters =
-        //   parsedData.skuParameters || product.skuParameters;
 
         // Update brand, weight, and dimensions
         updateData.brand = parsedData.brand || product.brand;
@@ -247,6 +241,14 @@ const updateProductBySupplier = async (req: any, res: Response) => {
       const uploadedImageUrls = (req.files as any[]).map(
         (file) => file.location
       );
+
+      // Delete old images from S3 if new images are uploaded
+      if (product.images && Array.isArray(product.images)) {
+        for (const oldImage of product.images) {
+          await deleteImageFromS3(oldImage);
+        }
+      }
+
       updateData.images = uploadedImageUrls; // Overwrite with uploaded images
     }
 
