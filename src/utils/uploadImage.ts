@@ -1,4 +1,4 @@
-import { S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import multer from "multer";
 import multerS3 from "multer-s3";
 
@@ -46,3 +46,20 @@ const upload = multer({
 });
 
 export const uploadMultipleImages = upload.array("images", 5); // 5 images max per product
+
+export const deleteImageFromS3 = async (imageUrl: string) => {
+  try {
+    const url = new URL(imageUrl);
+    const key = url.pathname.substring(1); // Remove the leading '/'
+
+    const deleteParams = {
+      Bucket: process.env.AWS_BUCKET_NAME!,
+      Key: key,
+    };
+
+    await s3Client.send(new DeleteObjectCommand(deleteParams));
+    console.log(`Deleted image from S3: ${imageUrl}`);
+  } catch (error) {
+    console.error(`Error deleting image from S3: ${imageUrl}`, error);
+  }
+};
