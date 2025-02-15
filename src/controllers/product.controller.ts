@@ -51,7 +51,7 @@ const getAllProducts = async (req: any, res: Response) => {
         select: "rating comment user_id",
       })
       .skip(skip)
-      .limit(limit);
+      // .limit(limit);
 
     // Fetch user's wishlist and cart
     const wishlist = await wishlistModel.findOne({ user_id: userId });
