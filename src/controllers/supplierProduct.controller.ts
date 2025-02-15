@@ -4,7 +4,6 @@ import categoryModel from "../models/Category.model";
 import productModel from "../models/Product.model";
 import supplierModel from "../models/Supplier.model";
 import apiResponse from "../utils/ApiResponse";
-import { deleteImageFromS3 } from "../utils/uploadImage";
 
 // Supplier Product Management
 const addProductBySupplier = async (req: any, res: Response) => {
@@ -251,22 +250,6 @@ const updateProductBySupplier = async (req: any, res: Response) => {
           "Invalid data format in 'data' field"
         );
       }
-    }
-
-    // Handle uploaded images (if files are present in form-data)
-    if (req.files && Array.isArray(req.files)) {
-      const uploadedImageUrls = (req.files as any[]).map(
-        (file) => file.location
-      );
-
-      // Delete old images from S3 if new images are uploaded
-      if (product.images && Array.isArray(product.images)) {
-        for (const oldImage of product.images) {
-          await deleteImageFromS3(oldImage);
-        }
-      }
-
-      updateData.images = uploadedImageUrls; // Overwrite with uploaded images
     }
 
     // Update the product
