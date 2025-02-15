@@ -439,9 +439,9 @@ const createSubCategory = async (req: Request, res: Response) => {
     }
 
     // Validate SKU parameters
-    if (skuParameters && !Array.isArray(skuParameters)) {
-      return apiResponse(res, 400, false, "SKU parameters must be an array");
-    }
+    // if (skuParameters && !Array.isArray(skuParameters)) {
+    //   return apiResponse(res, 400, false, "SKU parameters must be an array");
+    // }
 
     // Create and save the new subcategory
     const newSubCategory = new categoryModel({
@@ -658,7 +658,7 @@ const updateSubCategory = async (req: Request, res: Response) => {
 
         updateData.name = parsedData.name || undefined;
         updateData.description = parsedData.description || undefined;
-        updateData.skuParameters = parsedData.skuParameters || undefined;
+        // updateData.skuParameters = parsedData.skuParameters || undefined;
 
         if (updateData.name) {
           updateData.slug = slugify(updateData.name, { lower: true });

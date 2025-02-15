@@ -47,7 +47,7 @@ const getAllProducts = async (req: Request, res: Response) => {
         select: "rating comment user_id",
       })
       .skip(skip)
-      .limit(limit);
+      // .limit(limit);
 
     // Count total number of products for pagination
     const totalProducts = await productModel.countDocuments();

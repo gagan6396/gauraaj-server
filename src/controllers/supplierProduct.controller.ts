@@ -50,7 +50,7 @@ const addProductBySupplier = async (req: any, res: Response) => {
       !price ||
       !stock ||
       !category_id ||
-      !skuParameters ||
+      // !skuParameters ||
       !brand ||
       !weight ||
       !dimensions ||
@@ -66,12 +66,12 @@ const addProductBySupplier = async (req: any, res: Response) => {
     }
 
     // Validate SKU parameters
-    if (
-      !Object.keys(skuParameters).length ||
-      Object.values(skuParameters).some((param: any) => !Array.isArray(param))
-    ) {
-      return apiResponse(res, 400, false, "Invalid SKU parameters format");
-    }
+    // if (
+    //   !Object.keys(skuParameters).length ||
+    //   Object.values(skuParameters).some((param: any) => !Array.isArray(param))
+    // ) {
+    //   return apiResponse(res, 400, false, "Invalid SKU parameters format");
+    // }
 
     // Check if SKU already exists
     const skuExists = await productModel.findOne({ sku });
@@ -141,7 +141,7 @@ const addProductBySupplier = async (req: any, res: Response) => {
       images: imageUrls, // Store the uploaded image URLs here
       reviews: [],
       rating: 0,
-      skuParameters,
+      // skuParameters,
       brand,
       weight,
       dimensions,
@@ -211,8 +211,8 @@ const updateProductBySupplier = async (req: any, res: Response) => {
           parsedData.subcategory_id || product.subcategory_id;
 
         // Update SKU parameters
-        updateData.skuParameters =
-          parsedData.skuParameters || product.skuParameters;
+        // updateData.skuParameters =
+        //   parsedData.skuParameters || product.skuParameters;
 
         // Update brand, weight, and dimensions
         updateData.brand = parsedData.brand || product.brand;
