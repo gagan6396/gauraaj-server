@@ -13,7 +13,7 @@ const supplierProductRoute = Router();
 
 // Define here the supplierProduct Routes
 supplierProductRoute.post(
-  "/:supplierId",
+  "/",
   authMiddleware,
   handleImageUpload,
   addProductBySupplier

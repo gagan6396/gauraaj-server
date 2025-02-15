@@ -172,6 +172,14 @@ const updateProductBySupplier = async (req: any, res: Response) => {
 
     let updateData: { [key: string]: any } = {};
 
+    // Ensure image URLs are added from the upload middleware
+    let imageUrls: string[] = [];
+    if (req.body.imageUrls && Array.isArray(req.body.imageUrls)) {
+      imageUrls = req.body.imageUrls;
+    } else if (req.body.imageUrl) {
+      imageUrls = [req.body.imageUrl];
+    }
+
     // Validate productId
     if (!productId) {
       return apiResponse(res, 400, false, "Product ID is required");
@@ -231,22 +239,7 @@ const updateProductBySupplier = async (req: any, res: Response) => {
         }
 
         // Handle imageUrls update
-        if (req.files && Array.isArray(req.files)) {
-          const uploadedImageUrls = (req.files as any[]).map(
-            (file) => file.location
-          );
-
-          // Delete old images from S3 if new images are uploaded
-          if (product.images && Array.isArray(product.images)) {
-            for (const oldImage of product.images) {
-              if (!parsedData.imageUrls.includes(oldImage)) {
-                await deleteImageFromS3(oldImage); // Delete images not in the updated list
-              }
-            }
-          }
-
-          updateData.images = uploadedImageUrls; // Overwrite with uploaded images
-        }
+        updateData.images = imageUrls; // Overwrite with uploaded images
       } catch (error) {
         return apiResponse(
           res,
