@@ -45,7 +45,9 @@ const getUserProfile = async (req: any, res: Response) => {
       return apiResponse(res, 404, false, "User not found");
     }
 
-    const profileExist = await profileModel.findOne({ user_id: user._id });
+    const profileExist = await profileModel
+      .findOne({ user_id: user._id })
+      .populate("orderList");
     if (!profileExist) {
       return apiResponse(
         res,

@@ -5,6 +5,7 @@ import Razorpay from "razorpay";
 import orderModel from "../models/Order.model";
 import PaymentModel from "../models/Payment.model";
 import productModel from "../models/Product.model";
+import profileModel from "../models/Profile.model";
 import ShippingModel from "../models/Shipping.model";
 import {
   cancelShipRocketOrder,
@@ -185,6 +186,11 @@ const createOrder = async (req: any, res: Response) => {
       savedOrder._id.toString(),
       shippingAddressId,
       addressSnapshot
+    );
+
+    profileModel.updateOne(
+      { user_id: userId },
+      { $push: { orderList: savedOrder._id } }
     );
 
     // Return success response
