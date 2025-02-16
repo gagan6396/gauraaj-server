@@ -5,6 +5,74 @@ import productModel from "../models/Product.model";
 import wishlistModel from "../models/WishList";
 import apiResponse from "../utils/ApiResponse";
 
+const getAllProductsWithOutAuth = async (req: any, res: Response) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const skip = (page - 1) * limit;
+
+    // Fetch all products with necessary fields
+    const products = await productModel
+      .find(
+        {}, // Fetch all products without filtering
+        {
+          supplier_id: 1,
+          category_id: 1,
+          subcategory_id: 1,
+          name: 1,
+          description: 1,
+          price: 1,
+          stock: 1,
+          skuParameters: 1,
+          images: 1,
+          rating: 1,
+          color: 1,
+          size: 1,
+          brand: 1,
+          sku: 1,
+          createdAt: 1,
+        }
+      )
+      .populate({
+        path: "supplier_id",
+        select: "shop_name shop_address email phone",
+      })
+      .populate({
+        path: "category_id",
+        select: "name description image slug",
+      })
+      .populate({
+        path: "subcategory_id",
+        select: "name description image slug",
+      })
+      .populate({
+        path: "reviews",
+        select: "rating comment user_id",
+      })
+      .skip(skip);
+    // .limit(limit);
+
+    // Count total number of products for pagination
+    const totalProducts = await productModel.countDocuments();
+
+    // Calculate total pages
+    const totalPages = Math.ceil(totalProducts / limit);
+
+    return apiResponse(res, 200, true, "Products fetched successfully", {
+      products: products,
+      pagination: {
+        totalProducts,
+        totalPages,
+        currentPage: page,
+        productsPerPage: limit,
+      },
+    });
+  } catch (error) {
+    console.error("Error while fetching all products", error);
+    return apiResponse(res, 500, false, "Internal server error");
+  }
+};
+
 const getAllProducts = async (req: any, res: Response) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
@@ -50,8 +118,8 @@ const getAllProducts = async (req: any, res: Response) => {
         path: "reviews",
         select: "rating comment user_id",
       })
-      .skip(skip)
-      // .limit(limit);
+      .skip(skip);
+    // .limit(limit);
 
     // Fetch user's wishlist and cart
     const wishlist = await wishlistModel.findOne({ user_id: userId });
@@ -95,6 +163,68 @@ const getAllProducts = async (req: any, res: Response) => {
   } catch (error) {
     console.error("Error while fetching all products", error);
     return apiResponse(res, 500, false, "Internal server error");
+  }
+};
+
+const getProductByIdWithOutAuth = async (req: any, res: Response) => {
+  try {
+    const { productId } = req.params;
+
+    if (!productId) {
+      return apiResponse(res, 400, false, "ProductId is Required");
+    }
+
+    const product: any = await productModel
+      .findById(productId, {
+        _id: 1,
+        supplier_id: 1,
+        category_id: 1,
+        subcategory_id: 1,
+        name: 1,
+        description: 1,
+        price: 1,
+        stock: 1,
+        skuParameters: 1,
+        images: 1,
+        rating: 1,
+        color: 1,
+        size: 1,
+        brand: 1,
+        sku: 1,
+        createdAt: 1,
+      })
+      .populate({
+        path: "supplier_id",
+        select: "username email shop_name shop_address",
+      })
+      .populate({
+        path: "category_id",
+        select: "name description image slug",
+      })
+      .populate({
+        path: "subcategory_id",
+        select: "name description image slug",
+      })
+      .populate({
+        path: "reviews",
+        select: "rating comment user_id", // Limit review fields
+      })
+      .lean();
+
+    if (!product) {
+      return apiResponse(res, 404, false, "Product not found");
+    }
+
+    return apiResponse(
+      res,
+      200,
+      true,
+      `Product fetched successfully: ${productId}`,
+      product
+    );
+  } catch (error) {
+    console.error("Error while fetching product by id", error);
+    return apiResponse(res, 500, false, "Internal Server Error");
   }
 };
 
@@ -366,5 +496,8 @@ const filterProduct = async (req: Request, res: Response) => {
   }
 };
 
-export { filterProduct, getAllProducts, getProductById, searchProduct };
+export {
+  filterProduct,
+  getAllProducts, getAllProductsWithOutAuth, getProductById, getProductByIdWithOutAuth, searchProduct
+};
 
