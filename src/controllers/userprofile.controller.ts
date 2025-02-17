@@ -384,35 +384,45 @@ const deleteProductFromWishlist = async (req: any, res: Response) => {
   }
 };
 
-// get user's current order
+// Get user's current orders
 const getUserOrders = async (req: any, res: Response) => {
   try {
     const userId = req?.user?.id;
 
+    // Validate user ID
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return apiResponse(res, 400, false, "Invalid user ID");
     }
 
+    // Check if user exists
     const userExist = await userModel.findById(userId);
     if (!userExist) {
       return apiResponse(res, 404, false, "User not found");
     }
 
-    const UserOrders = await orderModel
-      .find({
-        user_id: userExist._id,
+    // Fetch user's orders
+    const userOrders = await orderModel
+      .find({ user_id: userExist._id })
+      .populate("user_id") // Populate user details
+      .populate({
+        path: "products.productId", // Populate product details (if `products` is an array)
+        model: "Product", // Replace with your product model name
       })
-      .sort({ createdAt: -1 });
+      .populate("shippingAddressId") // Populate shipping address details
+      .populate("payment_id") // Populate payment details
+      .sort({ createdAt: -1 }); // Sort by most recent orders
 
-    if (UserOrders.length === 0) {
+    // Check if orders exist
+    if (userOrders.length === 0) {
       return apiResponse(res, 404, false, "No orders found");
     }
 
-    return apiResponse(res, 200, true, "Orders Fetch Succesfully", {
-      orders: UserOrders,
+    // Return success response with orders
+    return apiResponse(res, 200, true, "Orders fetched successfully", {
+      orders: userOrders,
     });
   } catch (error) {
-    console.error("Error while fetching user orders", error);
+    console.error("Error while fetching user orders:", error);
     return apiResponse(res, 500, false, "Internal server error");
   }
 };
