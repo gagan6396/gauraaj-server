@@ -51,7 +51,7 @@ const getAllReviwsForProduct = async (req: Request, res: Response) => {
       .populate("userId")
       .sort({ createdAt: -1 });
 
-    if (!reviews || reviews.length === 0) {
+    if (!reviews) {
       return apiResponse(res, 404, false, "No reviews found");
     }
 
@@ -68,7 +68,7 @@ const getAllReviews = async (req: Request, res: Response) => {
       .populate("userId")
       .sort({ createdAt: -1 });
 
-    if (!reviews || reviews.length === 0) {
+    if (!reviews) {
       return apiResponse(res, 404, false, "No reviews found");
     }
 
