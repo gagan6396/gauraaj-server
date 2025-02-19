@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   addReview,
   deleteReview,
+  getAllReviews,
   getAllReviwsForProduct,
   getReviewsByUser,
   updateReview,
@@ -12,6 +13,7 @@ const reviewRoute = Router();
 
 // Define here all review Routes
 reviewRoute.post("/", authMiddleware, addReview);
+reviewRoute.get("/", getAllReviews);
 
 reviewRoute.get("/products/:productId", getAllReviwsForProduct);
 

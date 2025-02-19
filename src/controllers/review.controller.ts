@@ -48,7 +48,24 @@ const getAllReviwsForProduct = async (req: Request, res: Response) => {
 
     const reviews = await reviewModel
       .find({ productId })
-      .populate("userId", "username email")
+      .populate("userId")
+      .sort({ createdAt: -1 });
+
+    if (!reviews || reviews.length === 0) {
+      return apiResponse(res, 404, false, "No reviews found");
+    }
+
+    return apiResponse(res, 200, true, "Reviews fetched successfully", reviews);
+  } catch (error) {
+    console.error("Error fetching reviews for product", error);
+    return apiResponse(res, 500, false, "Error fetching reviews for product");
+  }
+};
+const getAllReviews = async (req: Request, res: Response) => {
+  try {
+    const reviews = await reviewModel
+      .find()
+      .populate("userId")
       .sort({ createdAt: -1 });
 
     if (!reviews || reviews.length === 0) {
@@ -131,6 +148,7 @@ const getReviewsByUser = async (req: any, res: Response) => {
 export {
   addReview,
   deleteReview,
+  getAllReviews,
   getAllReviwsForProduct,
   getReviewsByUser,
   updateReview
