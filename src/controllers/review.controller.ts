@@ -1,13 +1,13 @@
 import { Request, Response } from "express";
+import mongoose from "mongoose";
+import productModel from "../models/Product.model";
 import reviewModel from "../models/Review.model";
 import apiResponse from "../utils/ApiResponse";
-import productModel from "../models/Product.model";
-import mongoose from "mongoose";
 
-const addReview = async (req: Request, res: Response) => {
+const addReview = async (req: any, res: Response) => {
   try {
-    const { userId, productId, rating, comment, images } = req.body;
-
+    const { productId, rating, comment } = req.body;
+    const userId = req?.user?.id;
     if (!mongoose.isValidObjectId(userId)) {
       return apiResponse(res, 400, false, "Invalid userId");
     }
@@ -27,7 +27,6 @@ const addReview = async (req: Request, res: Response) => {
       productId,
       rating,
       comment,
-      images,
     });
 
     await reviews.save();
@@ -66,11 +65,11 @@ const getAllReviwsForProduct = async (req: Request, res: Response) => {
 const updateReview = async (req: Request, res: Response) => {
   try {
     const { reviewId } = req.params;
-    const { rating, comment, images } = req.body;
+    const { rating, comment } = req.body;
 
     const updatedReview = await reviewModel.findByIdAndUpdate(
       reviewId,
-      { $set: { rating, comment, images } },
+      { $set: { rating, comment } },
       { new: true }
     );
 
@@ -108,9 +107,9 @@ const deleteReview = async (req: Request, res: Response) => {
   }
 };
 
-const getReviewsByUser = async (req: Request, res: Response) => {
+const getReviewsByUser = async (req: any, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = req?.user?.id;
 
     const reviews = await reviewModel
       .find({ userId })
@@ -131,8 +130,9 @@ const getReviewsByUser = async (req: Request, res: Response) => {
 
 export {
   addReview,
-  getAllReviwsForProduct,
-  updateReview,
   deleteReview,
+  getAllReviwsForProduct,
   getReviewsByUser,
+  updateReview
 };
+

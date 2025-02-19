@@ -1,40 +1,24 @@
 import { Router } from "express";
 import {
   addReview,
-  getAllReviwsForProduct,
-  updateReview,
   deleteReview,
+  getAllReviwsForProduct,
   getReviewsByUser,
+  updateReview,
 } from "../controllers/review.controller";
-import {
-  addReviewSchema,
-  updateReviewSchema,
-  reviewIdParamSchema,
-  productIdParamSchema,
-} from "../Schema/review.schema";
-import validateRequest from "../middlewares/validateSchema";
+import authMiddleware from "../middlewares/authMiddleware";
 
 const reviewRoute = Router();
 
 // Define here all review Routes
-reviewRoute.post("/", addReview);
-reviewRoute.get(
-  "/products/:productId",
-  // validateRequest({ params: productIdParamSchema }),
-  getAllReviwsForProduct
-);
-reviewRoute.patch(
-  "/:reviewId",
-  // validateRequest({ params: reviewIdParamSchema, body: updateReviewSchema }),
-  updateReview
-);
+reviewRoute.post("/", authMiddleware, addReview);
 
-reviewRoute.delete(
-  "/:reviewId",
-  // validateRequest({ params: reviewIdParamSchema }),
-  deleteReview
-);
+reviewRoute.get("/products/:productId", getAllReviwsForProduct);
 
-reviewRoute.get("user/:userId", getReviewsByUser);
+reviewRoute.patch("/:reviewId", authMiddleware, updateReview);
+
+reviewRoute.delete("/:reviewId", deleteReview);
+
+reviewRoute.get("/user", authMiddleware, getReviewsByUser);
 
 export default reviewRoute;
