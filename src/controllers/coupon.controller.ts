@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
-import apiResponse from "../utils/ApiResponse";
 import couponModel from "../models/Coupon.model";
 import UserModel from "../models/User.model"; // Assuming you have a User model to manage users
+import apiResponse from "../utils/ApiResponse";
 
 // Create Coupon for Supplier
 export const createSupplierCoupon = async (req: Request, res: Response) => {

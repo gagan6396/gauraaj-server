@@ -3,12 +3,16 @@ import cors from "cors";
 import express from "express";
 import adminAnalyticsRoute from "./routes/adminAnalytics.route";
 import adminRoute from "./routes/adminAuth.route";
-import { default as adminProductRoute, default as router } from "./routes/adminProduct.route";
+import {
+    default as adminProductRoute,
+    default as router,
+} from "./routes/adminProduct.route";
 import adminSupplierRoute from "./routes/adminSupplier.route";
 import adminUserRoute from "./routes/adminUser.route";
 import cartRoute from "./routes/cart.route";
 import categoryRoute from "./routes/category.route";
 import checkoutRoute from "./routes/checkout.route";
+import contactRoute from "./routes/contact.route";
 import couponRoute from "./routes/coupon.route";
 import googleRoute from "./routes/googleAuth.route";
 import orderRoute from "./routes/order.route";
@@ -41,7 +45,7 @@ app.use("/api/v1/cart", cartRoute);
 app.use("/api/v1/supplier", supplierRoute);
 app.use("/api/v1/admin", adminRoute);
 app.use("/api/v1/admin/supplier", adminSupplierRoute);
-app.use("/api/v1/admin/supplier/users",adminUserRoute);
+app.use("/api/v1/admin/supplier/users", adminUserRoute);
 app.use("/api/v1/supplier/products", supplierProductRoute);
 app.use("/api/v1/supplier/profile", supplierProfileRoute);
 app.use("/api/v1/supplier/analytics", supplierAnalyticsRoute);
@@ -56,5 +60,6 @@ app.use("/api/v1/auth", googleRoute);
 app.use("/api/v1/sales", salesRoute);
 app.use("/api/v1/shiprocket", shipRocketRoute);
 app.use("/api/v1/payment", paymentRoute);
+app.use("/api/v1/contact", contactRoute);
 
 export default app;
