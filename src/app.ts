@@ -1,6 +1,7 @@
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
+import adminRouter from "./routes/admin.route";
 import adminAnalyticsRoute from "./routes/adminAnalytics.route";
 import adminRoute from "./routes/adminAuth.route";
 import {
@@ -63,5 +64,6 @@ app.use("/api/v1/shiprocket", shipRocketRoute);
 app.use("/api/v1/payment", paymentRoute);
 app.use("/api/v1/contact", contactRoute);
 app.use("/api/v1/reels", reelRoute);
+app.use("/api/v1/admin", adminRouter);
 
 export default app;
