@@ -3,25 +3,16 @@ import {
   LoginUser,
   logOut,
   RegisterUser,
-  reset_password,
+  requestPasswordReset,
+  resetPassword,
 } from "../controllers/userauth.controller";
+
 const userRoute = Router();
 
-userRoute.post(
-  "/auth/register",
-  // validateRequest({ body: registerSchema }),
-  RegisterUser
-);
-userRoute.post(
-  "/auth/login",
-  // validateRequest({ body: loginSchema }),
-  LoginUser
-);
-userRoute.post(
-  "/auth/reset_password",
-  // validateRequest({ body: resetPasswordSchema }),
-  reset_password
-);
+userRoute.post("/auth/register", RegisterUser);
+userRoute.post("/auth/login", LoginUser);
+userRoute.post("/auth/request-reset-password", requestPasswordReset); // New endpoint for requesting reset
+userRoute.post("/auth/reset-password", resetPassword); // Updated endpoint for resetting password
 userRoute.post("/auth/logout", logOut);
 
 export default userRoute;
