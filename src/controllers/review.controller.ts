@@ -61,11 +61,13 @@ const getAllReviwsForProduct = async (req: Request, res: Response) => {
     return apiResponse(res, 500, false, "Error fetching reviews for product");
   }
 };
+
 const getAllReviews = async (req: Request, res: Response) => {
   try {
     const reviews = await reviewModel
       .find()
       .populate("userId")
+      .populate("productId")
       .sort({ createdAt: -1 });
 
     if (!reviews) {
