@@ -180,7 +180,8 @@ const getOrderById = async (req: any, res: Response) => {
       .populate({
         path: "shippingAddressId",
         select: "shoppingAddress",
-      });
+      })
+      .populate("payment_id");
 
     if (!order) {
       return apiResponse(res, 404, false, "Order not found.");
