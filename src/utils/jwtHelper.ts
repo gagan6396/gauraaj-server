@@ -1,15 +1,19 @@
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET || "BoostEngineIsAmazing";
-const JWT_REFRESH_SECRET =
-  process.env.JWT_REFRESH_SECRET || "BoostEngineIsSuperSecure";
+const JWT_SECRET = process.env.JWT_SECRET as string;
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET as string;
 
-// Generate access token
+// Ensure secrets exist
+if (!JWT_SECRET || !JWT_REFRESH_SECRET) {
+  throw new Error("Missing JWT secrets in environment variables.");
+}
+
+// Generate access token (short-lived)
 export const generateToken = (payload: object) => {
-  return jwt.sign(payload, JWT_SECRET);
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: "15d" }); // 15 minutes
 };
 
-// Generate refresh token
+// Generate refresh token (longer-lived)
 export const generateRefreshToken = (payload: object) => {
-  return jwt.sign(payload, JWT_REFRESH_SECRET);
+  return jwt.sign(payload, JWT_REFRESH_SECRET, { expiresIn: "15d" }); // 7 days
 };
