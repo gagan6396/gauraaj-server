@@ -76,10 +76,24 @@ const verifyPayment = async (req: Request, res: Response) => {
       return apiResponse(res, 400, false, "Invalid order ID");
     }
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-      return apiResponse(res, 400, false, "Missing payment verification details");
+      return apiResponse(
+        res,
+        400,
+        false,
+        "Missing payment verification details"
+      );
     }
-    if (!addressSnapshot || !addressSnapshot.addressLine1 || !addressSnapshot.postalCode) {
-      return apiResponse(res, 400, false, "Invalid or incomplete address snapshot");
+    if (
+      !addressSnapshot ||
+      !addressSnapshot.addressLine1 ||
+      !addressSnapshot.postalCode
+    ) {
+      return apiResponse(
+        res,
+        400,
+        false,
+        "Invalid or incomplete address snapshot"
+      );
     }
 
     // Verify payment signature
