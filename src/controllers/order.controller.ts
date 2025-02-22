@@ -9,7 +9,6 @@ import profileModel from "../models/Profile.model";
 import ShippingModel from "../models/Shipping.model";
 import {
   cancelShipRocketOrder,
-  createShipRocketOrder,
   getOrderDetailsFromShipRocket,
   shipRocketReturnOrder,
   shipRocketTrackOrder,
@@ -123,91 +122,102 @@ const createShippingRecord = async (
 
 // Main controller for creating an order
 const createOrder = async (req: any, res: Response) => {
+  const session: any = await mongoose.startSession();
+  session?.startTransaction();
+
   try {
     const userId = req?.user?.id;
-    const { products, shippingAddressId, paymentMethod, addressSnapshot } =
-      req.body;
+    const { products, shippingAddress, paymentMethod, userDetails } = req.body;
 
-    // Validate inputs
-    validateOrderInputs(userId, products, shippingAddressId, paymentMethod);
-
-    // Process products and calculate total amount
-    const { totalAmount, updatedProducts } = await processProducts(products);
-
-    // Create Razorpay order if payment method is Razorpay
-    let razorpayOrder = null;
-    if (paymentMethod === "Razorpay") {
-      const options = {
-        amount: totalAmount * 100, // Convert to paise
-        currency: "INR",
-        receipt: `receipt_${Math.random().toString(36).substring(7)}`,
-      };
-      razorpayOrder = await razorpay.orders.create(options);
+    // 1. Validate inputs
+    if (!userId || !products?.length || !shippingAddress || !paymentMethod) {
+      throw new Error("Missing required fields");
     }
 
-    // Create payment record
-    const payment = new PaymentModel({
-      userId,
-      paymentMethod,
-      transactionId: razorpayOrder?.id || "COD",
-      amount: totalAmount,
-      status: "Pending",
-    });
-    await payment.save();
+    // 2. Process products and check stock
+    const { totalAmount, updatedProducts } = await processProducts(products);
 
-    // Create the order
+    // 3. Create initial order with pending status
     const newOrder = new orderModel({
-      user_id: new mongoose.Types.ObjectId(userId),
+      user_id: userId,
       orderDate: new Date(),
       totalAmount,
       orderStatus: "Pending",
+      shippingStatus: "Pending",
       products: updatedProducts,
-      shippingAddressId: new mongoose.Types.ObjectId(shippingAddressId),
-      payment_id: payment._id,
     });
-    const savedOrder = await newOrder.save();
 
-    // Update payment with order ID
-    payment.orderId = savedOrder._id;
-    await payment.save();
+    const savedOrder = await newOrder.save({ session });
 
-    // Create ShipRocket order
-    const shipRocketResponse = await createShipRocketOrder({
-      orderId: savedOrder._id.toString(),
-      products: updatedProducts,
-      addressSnapshot,
-    });
-    savedOrder.shipRocketOrderId = shipRocketResponse.order_id;
-    await savedOrder.save();
+    // 4. Handle payment
+    let paymentData;
+    if (paymentMethod === "Razorpay") {
+      const razorpayOrder = await razorpay.orders.create({
+        amount: totalAmount * 100,
+        currency: "INR",
+        receipt: `order_${savedOrder._id}`,
+      });
 
-    // Create shipping record
-    const savedShipping = await createShippingRecord(
-      userId,
-      savedOrder._id.toString(),
-      shippingAddressId,
-      addressSnapshot
-    );
+      paymentData = new PaymentModel({
+        userId,
+        orderId: savedOrder._id,
+        paymentMethod,
+        transactionId: razorpayOrder.id,
+        amount: totalAmount,
+        status: "Pending",
+      });
+    } else {
+      paymentData = new PaymentModel({
+        userId,
+        orderId: savedOrder._id,
+        paymentMethod,
+        transactionId: `COD_${savedOrder._id}`,
+        amount: totalAmount,
+        status: "Pending",
+      });
+    }
 
-    profileModel.updateOne(
+    const savedPayment = await paymentData.save({ session });
+
+    // 5. Update order with payment reference
+    savedOrder.payment_id = savedPayment._id;
+    savedOrder.shippingAddressId = savedOrder._id; // Using order ID temporarily until shipping is created
+    await savedOrder.save({ session });
+
+    // 6. Update user profile
+    await profileModel.updateOne(
       { user_id: userId },
-      { $push: { orderList: savedOrder._id } }
+      {
+        $set: {
+          first_name: userDetails.name.split(" ")[0],
+          last_name: userDetails.name.split(" ")[1] || "",
+          phone: userDetails.phone,
+          shoppingAddress: shippingAddress,
+        },
+        $push: { orderList: savedOrder._id },
+      },
+      { session }
     );
 
-    // Return success response
-    return apiResponse(res, 200, true, "Order placed successfully", {
-      order: savedOrder,
-      shipping: savedShipping,
-      shipRocket: shipRocketResponse,
-      razorpayOrder,
+    await session.commitTransaction();
+
+    return apiResponse(res, 200, true, "Order created successfully", {
+      orderId: savedOrder._id,
+      totalAmount,
+      razorpayOrderId:
+        paymentMethod === "Razorpay" ? paymentData.transactionId : null,
     });
   } catch (error: any) {
-    console.error("Error while placing order:", error);
+    await session.abortTransaction();
+    console.error("Order creation failed:", error);
     return apiResponse(
       res,
       500,
       false,
-      error.message || "Error while placing order"
+      error.message || "Failed to create order"
     );
+  } finally {
+    session.endSession();
   }
 };
 

@@ -18,6 +18,7 @@ import googleRoute from "./routes/googleAuth.route";
 import orderRoute from "./routes/order.route";
 import paymentRoute from "./routes/payment.route";
 import productRoute from "./routes/product.route";
+import reelRoute from "./routes/reel.route";
 import reviewRoute from "./routes/review.route";
 import salesRoute from "./routes/sales.route";
 import shipRocketRoute from "./routes/shipRocket.route";
@@ -61,5 +62,6 @@ app.use("/api/v1/sales", salesRoute);
 app.use("/api/v1/shiprocket", shipRocketRoute);
 app.use("/api/v1/payment", paymentRoute);
 app.use("/api/v1/contact", contactRoute);
+app.use("/api/v1/reels", reelRoute);
 
 export default app;

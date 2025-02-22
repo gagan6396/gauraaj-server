@@ -1,8 +1,12 @@
 import crypto from "crypto";
 import dotenv from "dotenv";
 import { Request, Response } from "express";
+import mongoose from "mongoose";
 import Razorpay from "razorpay";
+import orderModel from "../models/Order.model";
 import PaymentModel from "../models/Payment.model";
+import ShippingModel from "../models/Shipping.model";
+import { createShipRocketOrder } from "../services/shipRocket.service";
 import apiResponse from "../utils/ApiResponse";
 
 dotenv.config();
@@ -59,43 +63,71 @@ const createOrder = async (req: Request, res: Response) => {
 
 // Verify Razorpay Payment
 const verifyPayment = async (req: Request, res: Response) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } =
-      req.body;
+    const { orderId, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
 
-    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-      return apiResponse(res, 400, false, "Invalid payment verification data");
-    }
-
+    // Verify signature
     const generatedSignature = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET as string)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest("hex");
 
     if (generatedSignature !== razorpay_signature) {
-      return apiResponse(res, 400, false, "Invalid payment signature");
+      throw new Error("Invalid payment signature");
     }
 
+    // Update payment and order atomically
     const payment = await PaymentModel.findOneAndUpdate(
       { transactionId: razorpay_order_id },
       { status: "Completed" },
-      { new: true }
+      { session, new: true }
     );
 
     if (!payment) {
-      return apiResponse(res, 404, false, "Payment not found");
+      throw new Error("Payment not found");
     }
 
-    return apiResponse(
-      res,
-      200,
-      true,
-      "Payment verified successfully",
-      payment
+    const order = await orderModel.findByIdAndUpdate(
+      orderId,
+      { orderStatus: "Confirmed", shippingStatus: "Pending" },
+      { session, new: true }
     );
-  } catch (error) {
-    console.error("Error verifying payment", error);
-    return apiResponse(res, 500, false, "Internal Server Error");
+
+    // Create shipping record
+    const shippingRecord = new ShippingModel({
+      userId: order.user_id,
+      orderId,
+      profileId: order.shippingAddressId,
+      addressSnapshot: req.body.addressSnapshot,
+      shippingStatus: "Pending",
+      estimatedDeliveryDate: new Date().setDate(new Date().getDate() + 7),
+    });
+    await shippingRecord.save({ session });
+
+    // Create ShipRocket order
+    const shipRocketResponse = await createShipRocketOrder({
+      orderId: orderId.toString(),
+      products: order.products,
+      addressSnapshot: req.body.addressSnapshot,
+    });
+
+    order.shipRocketOrderId = shipRocketResponse.order_id;
+    await order.save({ session });
+
+    await session.commitTransaction();
+
+    return apiResponse(res, 200, true, "Payment verified successfully", {
+      orderId,
+      paymentId: payment._id,
+    });
+  } catch (error: any) {
+    await session.abortTransaction();
+    return apiResponse(res, 400, false, error.message || "Payment verification failed");
+  } finally {
+    session.endSession();
   }
 };
 
