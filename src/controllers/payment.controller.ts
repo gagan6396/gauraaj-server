@@ -62,9 +62,6 @@ const createOrder = async (req: Request, res: Response) => {
 
 // Verify Razorpay Payment
 const verifyPayment = async (req: Request, res: Response) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
     const {
       orderId,
@@ -90,7 +87,7 @@ const verifyPayment = async (req: Request, res: Response) => {
     const payment = await PaymentModel.findOneAndUpdate(
       { transactionId: razorpay_order_id },
       { status: "Completed" },
-      { session, new: true }
+      { new: true }
     );
 
     if (!payment) {
@@ -100,7 +97,7 @@ const verifyPayment = async (req: Request, res: Response) => {
     const order = await orderModel.findByIdAndUpdate(
       orderId,
       { orderStatus: "Confirmed", shippingStatus: "Pending" },
-      { session, new: true }
+      { new: true }
     );
 
     if (!order) {
@@ -115,33 +112,29 @@ const verifyPayment = async (req: Request, res: Response) => {
       shippingStatus: "Pending",
       estimatedDeliveryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     });
-    await shippingRecord.save({ session });
+    const savedShipping = await shippingRecord.save();
 
-    order.shippingAddressId = shippingRecord._id;
+    order.shippingAddressId = savedShipping._id;
     const shipRocketResponse = await createShipRocketOrder({
       orderId: orderId.toString(),
       products: order.products,
       addressSnapshot,
     });
     order.shipRocketOrderId = shipRocketResponse.order_id;
-    await order.save({ session });
-
-    await session.commitTransaction();
+    await order.save();
 
     return apiResponse(res, 200, true, "Payment verified successfully", {
       orderId,
       paymentId: payment._id,
     });
   } catch (error: any) {
-    await session.abortTransaction();
+    console.error("Payment verification failed:", error);
     return apiResponse(
       res,
       400,
       false,
       error.message || "Payment verification failed"
     );
-  } finally {
-    session.endSession();
   }
 };
 
