@@ -10,10 +10,10 @@ if (!JWT_SECRET || !JWT_REFRESH_SECRET) {
 
 // Generate access token (short-lived)
 export const generateToken = (payload: object) => {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "15d" }); // 15 minutes
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: "15m" }); // 15 minutes
 };
 
 // Generate refresh token (longer-lived)
 export const generateRefreshToken = (payload: object) => {
-  return jwt.sign(payload, JWT_REFRESH_SECRET, { expiresIn: "15d" }); // 7 days
+  return jwt.sign(payload, JWT_REFRESH_SECRET, { expiresIn: "7d" }); // 7 days
 };
