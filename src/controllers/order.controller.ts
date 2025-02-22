@@ -1,4 +1,3 @@
-import dotenv from "dotenv";
 import { Request, Response } from "express";
 import mongoose from "mongoose";
 import Razorpay from "razorpay";
@@ -7,137 +6,82 @@ import PaymentModel from "../models/Payment.model";
 import productModel from "../models/Product.model";
 import profileModel from "../models/Profile.model";
 import ShippingModel from "../models/Shipping.model";
-import {
-  cancelShipRocketOrder,
-  getOrderDetailsFromShipRocket,
-  shipRocketReturnOrder,
-  shipRocketTrackOrder,
-} from "../services/shipRocket.service";
+import { cancelShipRocketOrder, getOrderDetailsFromShipRocket, shipRocketReturnOrder, shipRocketTrackOrder } from "../services/shipRocket.service";
 import apiResponse from "../utils/ApiResponse";
-
-dotenv.config();
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID as string,
   key_secret: process.env.RAZORPAY_KEY_SECRET as string,
 });
 
-// Helper function to validate order inputs
-const validateOrderInputs = (
-  userId: string,
-  products: any[],
-  shippingAddressId: string,
-  paymentMethod: string
-) => {
-  if (!userId || !products || !shippingAddressId || !paymentMethod) {
-    throw new Error("All fields are required");
-  }
-
-  if (!mongoose.Types.ObjectId.isValid(userId)) {
-    throw new Error("Invalid User ID");
-  }
-
-  if (!mongoose.Types.ObjectId.isValid(shippingAddressId)) {
-    throw new Error("Invalid Shipping Address ID");
-  }
-
-  if (!Array.isArray(products) || products.length === 0) {
-    throw new Error("Products are empty");
-  }
-};
-
-// Helper function to process products and calculate total amount
-const processProducts = async (products: any[]) => {
+const processProducts = async (products: any[], session: any) => {
   let totalAmount = 0;
   const updatedProducts = [];
 
   for (const item of products) {
-    const { productId, quantity, skuParameters } = item;
+    const { productId, quantity } = item;
 
-    if (!productId || !quantity) {
-      throw new Error("Invalid product or quantity.");
+    if (!mongoose.Types.ObjectId.isValid(productId) || quantity < 1) {
+      throw new Error("Invalid product ID or quantity");
     }
 
-    const productDetails = await productModel.findById(productId);
-    if (!productDetails) {
+    const product = await productModel.findById(productId).session(session);
+    if (!product) {
       throw new Error(`Product not found: ${productId}`);
     }
-
-    if (productDetails.stock < quantity) {
-      throw new Error(
-        `Insufficient stock for product "${productDetails.name}". Available stock: ${productDetails.stock}.`
-      );
+    if (product.stock < quantity) {
+      throw new Error(`Insufficient stock for "${product.name}"`);
     }
 
-    // Deduct stock after placing the order
-    productDetails.stock -= quantity;
-    await productDetails.save();
+    const discount = item.discount || 0;
+    const tax = item.tax || 0;
+    const priceAfterDiscount = product.price - (product.price * discount) / 100;
+    const finalPrice = priceAfterDiscount + (priceAfterDiscount * tax) / 100;
 
-    // Calculate price with discount and tax
-    const discountAmount = (productDetails.price * (item.discount || 0)) / 100;
-    const priceAfterDiscount = productDetails.price - discountAmount;
-    const taxAmount = (priceAfterDiscount * (item.tax || 0)) / 100;
-    const finalPricePerProduct = priceAfterDiscount + taxAmount;
+    totalAmount += finalPrice * quantity;
 
-    // Add to total order amount
-    totalAmount += finalPricePerProduct * quantity;
-
-    // Prepare product data including SKU parameters
     updatedProducts.push({
-      productId: productId.toString(),
+      productId: productId,
       quantity,
-      selling_price: productDetails.price,
-      name: productDetails.name,
-      sku: productDetails.sku,
-      discount: item.discount || 0,
-      tax: item.tax || 0,
-      dimensions: productDetails.dimensions,
-      skuParameters: skuParameters || {},
+      selling_price: product.price,
+      name: product.name,
+      sku: product.sku,
+      discount,
+      tax,
+      dimensions: product.dimensions,
     });
+
+    // Reserve stock (will be committed after payment)
+    product.stock -= quantity;
+    await product.save({ session });
   }
 
   return { totalAmount, updatedProducts };
 };
 
-// Helper function to create a shipping record
-const createShippingRecord = async (
-  userId: string,
-  orderId: string,
-  shippingAddressId: string,
-  addressSnapshot: any
-) => {
-  const shippingRecord = new ShippingModel({
-    userId: new mongoose.Types.ObjectId(userId),
-    orderId: new mongoose.Types.ObjectId(orderId),
-    profileId: new mongoose.Types.ObjectId(shippingAddressId),
-    addressSnapshot,
-    shippingStatus: "Pending",
-    estimatedDeliveryDate: new Date(
-      new Date().setDate(new Date().getDate() + 7)
-    ), // 7 days from today
-  });
-
-  return await shippingRecord.save();
-};
-
-// Main controller for creating an order
 const createOrder = async (req: any, res: Response) => {
-  const session: any = await mongoose.startSession();
-  session?.startTransaction();
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
   try {
     const userId = req?.user?.id;
     const { products, shippingAddress, paymentMethod, userDetails } = req.body;
 
-    // 1. Validate inputs
-    if (!userId || !products?.length || !shippingAddress || !paymentMethod) {
+    if (
+      !userId ||
+      !products?.length ||
+      !shippingAddress ||
+      !paymentMethod ||
+      !userDetails
+    ) {
       throw new Error("Missing required fields");
     }
 
-    // 2. Process products and check stock
-    const { totalAmount, updatedProducts } = await processProducts(products);
+    const { totalAmount, updatedProducts } = await processProducts(
+      products,
+      session
+    );
 
-    // 3. Create initial order with pending status
     const newOrder = new orderModel({
       user_id: userId,
       orderDate: new Date(),
@@ -145,11 +89,11 @@ const createOrder = async (req: any, res: Response) => {
       orderStatus: "Pending",
       shippingStatus: "Pending",
       products: updatedProducts,
+      shippingAddressId: new mongoose.Types.ObjectId(), // Temporary ID
     });
 
     const savedOrder = await newOrder.save({ session });
 
-    // 4. Handle payment
     let paymentData;
     if (paymentMethod === "Razorpay") {
       const razorpayOrder = await razorpay.orders.create({
@@ -166,7 +110,7 @@ const createOrder = async (req: any, res: Response) => {
         amount: totalAmount,
         status: "Pending",
       });
-    } else {
+    } else if (paymentMethod === "COD") {
       paymentData = new PaymentModel({
         userId,
         orderId: savedOrder._id,
@@ -175,24 +119,22 @@ const createOrder = async (req: any, res: Response) => {
         amount: totalAmount,
         status: "Pending",
       });
+    } else {
+      throw new Error("Invalid payment method");
     }
 
     const savedPayment = await paymentData.save({ session });
-
-    // 5. Update order with payment reference
     savedOrder.payment_id = savedPayment._id;
-    savedOrder.shippingAddressId = savedOrder._id; // Using order ID temporarily until shipping is created
     await savedOrder.save({ session });
 
-    // 6. Update user profile
     await profileModel.updateOne(
       { user_id: userId },
       {
         $set: {
           first_name: userDetails.name.split(" ")[0],
-          last_name: userDetails.name.split(" ")[1] || "",
+          last_name: userDetails.name.split(" ").slice(1).join(" ") || "",
           phone: userDetails.phone,
-          shoppingAddress: shippingAddress,
+          shippingAddress,
         },
         $push: { orderList: savedOrder._id },
       },
@@ -212,7 +154,7 @@ const createOrder = async (req: any, res: Response) => {
     console.error("Order creation failed:", error);
     return apiResponse(
       res,
-      500,
+      400,
       false,
       error.message || "Failed to create order"
     );

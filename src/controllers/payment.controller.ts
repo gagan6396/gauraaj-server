@@ -1,4 +1,3 @@
-import crypto from "crypto";
 import dotenv from "dotenv";
 import { Request, Response } from "express";
 import mongoose from "mongoose";
@@ -67,10 +66,19 @@ const verifyPayment = async (req: Request, res: Response) => {
   session.startTransaction();
 
   try {
-    const { orderId, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+    const {
+      orderId,
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      addressSnapshot,
+    } = req.body;
 
-    // Verify signature
-    const generatedSignature = crypto
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      throw new Error("Invalid order ID");
+    }
+
+    const generatedSignature = require("crypto")
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET as string)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest("hex");
@@ -79,7 +87,6 @@ const verifyPayment = async (req: Request, res: Response) => {
       throw new Error("Invalid payment signature");
     }
 
-    // Update payment and order atomically
     const payment = await PaymentModel.findOneAndUpdate(
       { transactionId: razorpay_order_id },
       { status: "Completed" },
@@ -96,24 +103,26 @@ const verifyPayment = async (req: Request, res: Response) => {
       { session, new: true }
     );
 
-    // Create shipping record
+    if (!order) {
+      throw new Error("Order not found");
+    }
+
     const shippingRecord = new ShippingModel({
       userId: order.user_id,
       orderId,
       profileId: order.shippingAddressId,
-      addressSnapshot: req.body.addressSnapshot,
+      addressSnapshot,
       shippingStatus: "Pending",
-      estimatedDeliveryDate: new Date().setDate(new Date().getDate() + 7),
+      estimatedDeliveryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     });
     await shippingRecord.save({ session });
 
-    // Create ShipRocket order
+    order.shippingAddressId = shippingRecord._id;
     const shipRocketResponse = await createShipRocketOrder({
       orderId: orderId.toString(),
       products: order.products,
-      addressSnapshot: req.body.addressSnapshot,
+      addressSnapshot,
     });
-
     order.shipRocketOrderId = shipRocketResponse.order_id;
     await order.save({ session });
 
@@ -125,7 +134,12 @@ const verifyPayment = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     await session.abortTransaction();
-    return apiResponse(res, 400, false, error.message || "Payment verification failed");
+    return apiResponse(
+      res,
+      400,
+      false,
+      error.message || "Payment verification failed"
+    );
   } finally {
     session.endSession();
   }
@@ -227,6 +241,10 @@ const getPaymentHistory = async (req: Request, res: Response) => {
 };
 
 export {
-  createOrder, getPaymentDetailsById, getPaymentHistory, initiateRefund, verifyPayment
+  createOrder,
+  getPaymentDetailsById,
+  getPaymentHistory,
+  initiateRefund,
+  verifyPayment
 };
 
