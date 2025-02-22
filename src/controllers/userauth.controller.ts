@@ -5,7 +5,7 @@ import nodemailer from "nodemailer";
 import profileModel from "../models/Profile.model";
 import userModel from "../models/User.model";
 import apiResponse from "../utils/ApiResponse";
-import { generateRefreshToken } from "../utils/jwtHelper";
+import { generateToken } from "../utils/jwtHelper";
 
 // Configure Nodemailer transporter for Gmail
 const transporter = nodemailer.createTransport({
@@ -45,10 +45,10 @@ const RegisterUser = async (req: Request, res: Response) => {
     });
 
     // Generate JWT token
-    const token = generateRefreshToken({
-      id: newUser._id,
-      email: newUser.email,
-    });
+    const token = generateToken({ id: newUser._id, email: newUser.email });
+
+    newUser.passwordResetToken = token;
+    await newUser.save();
 
     // Create a profile for the new user
     await profileModel.create({
@@ -114,10 +114,7 @@ const LoginUser = async (req: Request, res: Response) => {
     }
 
     // Generate JWT token
-    const token = generateRefreshToken({
-      id: userExist._id,
-      email: userExist.email,
-    });
+    const token = generateToken({ id: userExist._id, email: userExist.email });
 
     userExist.passwordResetToken = token;
     await userExist.save();
@@ -155,10 +152,7 @@ const requestPasswordReset = async (req: Request, res: Response) => {
     }
 
     // Generate reset token
-    const resetToken = generateRefreshToken({
-      id: user._id,
-      email: user.email,
-    }); // Expires in 1 hour
+    const resetToken = generateToken({ id: user._id, email: user.email }); // Expires in 1 hour
     user.passwordResetToken = resetToken;
     await user.save();
 
