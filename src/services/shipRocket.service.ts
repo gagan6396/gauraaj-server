@@ -244,33 +244,33 @@ const createShipRocketOrder = async (
   try {
     const { orderId, products, addressSnapshot } = orderData;
 
-    console.log("Creating order for", orderId);
-
-    if (!orderId || !products || !addressSnapshot) {
-      throw new Error("Required fields are missing in the request.");
-    }
-
-    if (!isValidObjectId(orderId)) {
+    // Validate inputs
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
       throw new Error(`Invalid order ID: ${orderId}`);
     }
-
-    // Validate addressSnapshot
-    if (!addressSnapshot.addressLine1 || !addressSnapshot.postalCode) {
-      throw new Error("Address snapshot is missing required fields: addressLine1 or postalCode.");
+    if (!products?.length) {
+      throw new Error("No valid products provided");
+    }
+    if (
+      !addressSnapshot?.addressLine1 ||
+      !addressSnapshot?.postalCode ||
+      !addressSnapshot?.city
+    ) {
+      throw new Error("Address snapshot missing required fields");
     }
 
+    // Fetch order with user details
     const order = await orderModel
-      .findById(new mongoose.Types.ObjectId(orderId))
+      .findById(orderId)
       .populate("user_id", "first_name last_name email phone");
-
     if (!order) {
-      throw new Error(`Order with ID ${orderId} not found.`);
+      throw new Error(`Order with ID ${orderId} not found`);
+    }
+    if (!order.user_id?.first_name || !order.user_id?.phone) {
+      throw new Error("User details missing required fields");
     }
 
-    if (!Array.isArray(products) || products.length === 0) {
-      throw new Error("No valid products provided for the order.");
-    }
-
+    // Process products and calculate totals
     let totalDimensions = { length: 0, width: 0, height: 0, weight: 0 };
     let sub_total = 0;
 
@@ -278,70 +278,64 @@ const createShipRocketOrder = async (
       products.map(async (product) => {
         const productDetails = await productModel.findById(product.productId);
         if (!productDetails) {
-          throw new Error(`Product with ID ${product.productId} not found.`);
+          throw new Error(`Product with ID ${product.productId} not found`);
         }
 
         const sellingPrice = parseFloat(
           product.selling_price?.toString() || "0"
         );
+        const dimensions = productDetails.dimensions || {
+          length: 10,
+          width: 5,
+          height: 8,
+        };
+        const weight = productDetails.weight || 0.5; // Default weight if missing
 
-        const productDimensions = productDetails.dimensions || {};
-        totalDimensions.length += productDimensions.length || 0;
-        totalDimensions.width += productDimensions.width || 0;
-        totalDimensions.height += productDimensions.height || 0;
-        totalDimensions.weight +=
-          (productDetails.weight || 0) * product.quantity;
+        totalDimensions.length += dimensions.length * product.quantity || 10;
+        totalDimensions.width += dimensions.width * product.quantity || 5;
+        totalDimensions.height += dimensions.height * product.quantity || 8;
+        totalDimensions.weight += weight * product.quantity;
 
         sub_total += product.quantity * sellingPrice;
 
         return {
-          productId: product.productId.toString(),
-          quantity: product.quantity,
+          name: productDetails.name || "Unnamed Product",
+          sku: productDetails.sku || `SKU-${product.productId}`,
+          units: product.quantity,
           selling_price: sellingPrice,
-          name: productDetails.name,
-          sku: productDetails.sku,
           discount: product.discount || 0,
           tax: product.tax || 0,
-          dimensions: productDimensions,
-          skuParameters: product.skuParameters || {},
+          sku_parameters: product.skuParameters || {},
         };
       })
     );
 
+    // Prepare ShipRocket request
     const requestBody = {
       order_id: order._id.toString(),
       order_date: new Date().toISOString(),
-      payment_method: "Prepaid",
+      payment_method: "Prepaid", // Adjust based on actual payment method if needed
       sub_total,
       shipping_is_billing: true,
       billing_customer_name: order.user_id.first_name,
       billing_last_name: order.user_id.last_name || "",
-      billing_address: addressSnapshot.addressLine1, // Fixed: Use addressLine1
+      billing_address: addressSnapshot.addressLine1,
       billing_city: addressSnapshot.city,
-      billing_state: addressSnapshot.state || "Jodhpur",
+      billing_state: addressSnapshot.state || "",
       billing_country: addressSnapshot.country || "India",
-      billing_phone: order.user_id.phone || "1234567890",
-      billing_pincode: addressSnapshot.postalCode, // Fixed: Use postalCode
-      order_items: updatedProducts.map((product) => ({
-        name: product.name || "Default Product Name",
-        sku: product.sku || "DEFAULT-SKU",
-        units: product.quantity,
-        selling_price: product.selling_price || 0,
-        discount: product.discount || 0,
-        tax: product.tax || 0,
-        sku_parameters: product.skuParameters,
-      })),
+      billing_phone: order.user_id.phone,
+      billing_pincode: addressSnapshot.postalCode,
+      billing_email: order.user_id.email || "",
+      order_items: updatedProducts,
       length: totalDimensions.length || 10,
       breadth: totalDimensions.width || 5,
       height: totalDimensions.height || 8,
-      weight: totalDimensions.weight || 2,
+      weight: totalDimensions.weight || 0.5,
     };
 
     console.log("ShipRocket Request Payload:", requestBody);
 
     const token = await getShipRocketToken();
-    console.log("ShipRocket Token:", token);
-
     const response = await axios.post(
       `${shipRocketConfig.baseUrl}/v1/external/orders/create/adhoc`,
       requestBody,
@@ -355,31 +349,27 @@ const createShipRocketOrder = async (
 
     console.log("ShipRocket Response:", response.data);
 
+    // Ensure Kafka message is sent successfully
     await sendMessageToKafka("shiprocket.orders", {
       event: "order_created",
-      orderId: orderId,
+      orderId,
       response: response.data,
     });
 
     return response.data;
   } catch (error: any) {
-    console.error(
-      "Error creating order in ShipRocket:",
-      error.response?.data || error.message
-    );
+    const errorMessage = error.response?.data?.message || error.message;
+    console.error("Error creating order in ShipRocket:", errorMessage);
 
     await sendMessageToKafka("shiprocket.orders", {
       event: "order_creation_failed",
       orderId: orderData.orderId,
-      error: error.response?.data || error.message,
+      error: errorMessage,
     });
 
-    throw new Error(
-      `Failed to create order in ShipRocket: ${error.response?.data || error.message}`
-    );
+    throw new Error(`ShipRocket order creation failed: ${errorMessage}`);
   }
 };
-
 const cancelShipRocketOrder = async (
   orderId: string,
   shipRocketOrderId: number

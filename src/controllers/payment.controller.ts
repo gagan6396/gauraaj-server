@@ -71,39 +71,50 @@ const verifyPayment = async (req: Request, res: Response) => {
       addressSnapshot,
     } = req.body;
 
+    // Validate inputs
     if (!mongoose.Types.ObjectId.isValid(orderId)) {
-      throw new Error("Invalid order ID");
+      return apiResponse(res, 400, false, "Invalid order ID");
+    }
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      return apiResponse(res, 400, false, "Missing payment verification details");
+    }
+    if (!addressSnapshot || !addressSnapshot.addressLine1 || !addressSnapshot.postalCode) {
+      return apiResponse(res, 400, false, "Invalid or incomplete address snapshot");
     }
 
+    // Verify payment signature
     const generatedSignature = require("crypto")
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET as string)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest("hex");
 
     if (generatedSignature !== razorpay_signature) {
-      throw new Error("Invalid payment signature");
+      return apiResponse(res, 400, false, "Invalid payment signature");
     }
 
+    // Update payment status
     const payment = await PaymentModel.findOneAndUpdate(
       { transactionId: razorpay_order_id },
       { status: "Completed" },
       { new: true }
     );
-
     if (!payment) {
-      throw new Error("Payment not found");
+      return apiResponse(res, 404, false, "Payment not found");
     }
 
+    // Update order status
     const order = await orderModel.findByIdAndUpdate(
       orderId,
       { orderStatus: "Confirmed", shippingStatus: "Pending" },
       { new: true }
     );
-
     if (!order) {
-      throw new Error("Order not found");
+      // Rollback payment status if order not found
+      await PaymentModel.findByIdAndUpdate(payment._id, { status: "Pending" });
+      return apiResponse(res, 404, false, "Order not found");
     }
 
+    // Create shipping record
     const shippingRecord = new ShippingModel({
       userId: order.user_id,
       orderId,
@@ -114,24 +125,44 @@ const verifyPayment = async (req: Request, res: Response) => {
     });
     const savedShipping = await shippingRecord.save();
 
+    // Update order with shipping ID
     order.shippingAddressId = savedShipping._id;
-    const shipRocketResponse = await createShipRocketOrder({
-      orderId: orderId.toString(),
-      products: order.products,
-      addressSnapshot,
-    });
-    order.shipRocketOrderId = shipRocketResponse.order_id;
+
+    // Create ShipRocket order
+    try {
+      const shipRocketResponse = await createShipRocketOrder({
+        orderId: orderId.toString(),
+        products: order.products,
+        addressSnapshot,
+      });
+      order.shipRocketOrderId = shipRocketResponse.order_id;
+    } catch (shipRocketError: any) {
+      console.error("ShipRocket integration failed:", shipRocketError);
+      // Optionally rollback shipping record if critical
+      await ShippingModel.deleteOne({ _id: savedShipping._id });
+      order.shippingAddressId = new mongoose.Types.ObjectId(); // Reset to temporary ID
+      await order.save();
+      return apiResponse(
+        res,
+        400,
+        false,
+        `Payment verified but shipping failed: ${shipRocketError.message}`
+      );
+    }
+
     await order.save();
 
     return apiResponse(res, 200, true, "Payment verified successfully", {
       orderId,
       paymentId: payment._id,
+      shippingId: savedShipping._id,
+      shipRocketOrderId: order.shipRocketOrderId,
     });
   } catch (error: any) {
     console.error("Payment verification failed:", error);
     return apiResponse(
       res,
-      400,
+      500,
       false,
       error.message || "Payment verification failed"
     );
