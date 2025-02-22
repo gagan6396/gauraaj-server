@@ -6,9 +6,9 @@ const JWT_SECRET = process.env.JWT_SECRET || "BoostEngineIsFutureStickCompany";
 
 interface DecodedUser extends JwtPayload {
   id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
 }
 
 const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
@@ -24,9 +24,6 @@ const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
   try {
     (req as Request & { user: DecodedUser }).user = {
       id: decoded.id,
-      first_name: decoded.first_name,
-      last_name: decoded.last_name,
-      email: decoded.email,
     };
 
     next();
