@@ -1,3 +1,4 @@
+// src/middlewares/authMiddleware.ts
 import { NextFunction, Request, Response } from "express";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import apiResponse from "../utils/ApiResponse";
@@ -18,16 +19,18 @@ const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
     return apiResponse(res, 401, false, "Access Denied: No token provided");
   }
 
-  const decoded = jwt.verify(token, JWT_SECRET) as DecodedUser;
-  console.log("decoded", decoded);
-
   try {
+    const decoded = jwt.verify(token, JWT_SECRET) as DecodedUser;
+    console.log("decoded", decoded);
+
+    // Attach user info to the request
     (req as Request & { user: DecodedUser }).user = {
       id: decoded.id,
     };
 
     next();
   } catch (error) {
+    console.error("Authentication error:", error); // Log the error for debugging
     return apiResponse(res, 401, false, "Invalid or expired Token");
   }
 };
