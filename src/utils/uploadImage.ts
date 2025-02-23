@@ -45,47 +45,6 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB file size limit per file
 });
 
-// Video-specific upload configuration
-const uploadVideos = multer({
-  storage: multerS3({
-    s3: s3Client,
-    bucket: process.env.AWS_BUCKET_NAME || "your-bucket-name",
-    acl: "public-read",
-    key: (req, file, cb) => {
-      const uniqueFileName = `${Date.now()}-${file.originalname}`;
-      cb(null, uniqueFileName);
-    },
-  }),
-  fileFilter: (req, file, cb) => {
-    if (file && file.mimetype) {
-      const mimeType = file.mimetype.toLowerCase();
-      const fileExtension =
-        file.originalname.split(".").pop()?.toLowerCase() || "";
-
-      const allowedVideoTypes = ["video/mp4"];
-      const allowedVideoExtensions = ["mp4"];
-
-      if (
-        allowedVideoTypes.includes(mimeType) ||
-        allowedVideoExtensions.includes(fileExtension)
-      ) {
-        cb(null, true);
-      } else {
-        cb(new Error("Invalid file type. Only MP4 is allowed for videos."));
-      }
-    } else {
-      cb(new Error("No video file provided"));
-    }
-  },
-  limits: {
-    fileSize: 50 * 1024 * 1024, // 50 MB for videos (adjust as needed)
-    files: 1, // Max 1 video
-  },
-});
-
-// Middleware to upload a single video
-export const uploadVideo = uploadVideos.single("video");
-
 export const uploadMultipleImages = upload.array("images", 5); // 5 images max per product
 
 export const deleteImageFromS3 = async (imageUrl: string) => {
