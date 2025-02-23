@@ -251,6 +251,7 @@ const getProductById = async (req: any, res: Response) => {
         stock: 1,
         skuParameters: 1,
         images: 1,
+        video: 1,
         rating: 1,
         color: 1,
         size: 1,
