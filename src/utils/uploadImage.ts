@@ -1,3 +1,4 @@
+// utils/uploadImage.ts
 import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import multer from "multer";
 import multerS3 from "multer-s3";
@@ -28,28 +29,41 @@ const upload = multer({
       const fileExtension =
         file.originalname.split(".").pop()?.toLowerCase() || "";
 
+      const allowedImageTypes = ["image/jpeg", "image/png", "image/jpg"];
+      const allowedVideoTypes = ["video/mp4"];
+      const allowedImageExtensions = ["jpg", "jpeg", "png"];
+      const allowedVideoExtensions = ["mp4"];
+
       if (
-        ["jpg", "jpeg", "png"].includes(fileExtension) ||
-        ["image/jpeg", "image/png", "image/jpg"].includes(mimeType)
+        allowedImageTypes.includes(mimeType) ||
+        allowedImageExtensions.includes(fileExtension) ||
+        allowedVideoTypes.includes(mimeType) ||
+        allowedVideoExtensions.includes(fileExtension)
       ) {
         cb(null, true);
       } else {
         cb(
-          new Error("Invalid file type. Only JPG, JPEG, and PNG are allowed.")
+          new Error(
+            "Invalid file type. Only JPG, JPEG, PNG, and MP4 are allowed."
+          )
         );
       }
     } else {
       cb(new Error("No file provided"));
     }
   },
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB file size limit per file
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB max to accommodate videos
 });
 
-export const uploadMultipleImages = upload.array("images", 5); // 5 images max per product
+// Middleware to upload both images and a single video
+export const uploadFiles = upload.fields([
+  { name: "images", maxCount: 5 }, // Up to 5 images
+  { name: "video", maxCount: 1 },  // Up to 1 video
+]);
 
-export const deleteImageFromS3 = async (imageUrl: string) => {
+export const deleteFileFromS3 = async (fileUrl: string) => {
   try {
-    const url = new URL(imageUrl);
+    const url = new URL(fileUrl);
     const key = url.pathname.substring(1); // Remove the leading '/'
 
     const deleteParams = {
@@ -58,8 +72,8 @@ export const deleteImageFromS3 = async (imageUrl: string) => {
     };
 
     await s3Client.send(new DeleteObjectCommand(deleteParams));
-    console.log(`Deleted image from S3: ${imageUrl}`);
+    console.log(`Deleted file from S3: ${fileUrl}`);
   } catch (error) {
-    console.error(`Error deleting image from S3: ${imageUrl}`, error);
+    console.error(`Error deleting file from S3: ${fileUrl}`, error);
   }
 };

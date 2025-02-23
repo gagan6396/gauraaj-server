@@ -1,38 +1,36 @@
+// middlewares/imageMiddleware.ts
 import { NextFunction, Request, Response } from "express";
-import apiResponse from "../utils/ApiResponse"; // Assuming this is your response handling utility
-import { uploadMultipleImages } from "../utils/uploadImage"; // Assuming your file is at this location
+import apiResponse from "../utils/ApiResponse";
+import { uploadFiles } from "../utils/uploadImage";
 
 const handleImageUpload = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
-  uploadMultipleImages(req, res, (error: any) => {
+  uploadFiles(req, res, (error: any) => {
     if (error) {
-      // Handle errors related to the upload process
-      console.error("Error uploading image:", error);
-
-      // Respond with error message
+      console.error("Error uploading files:", error);
       return apiResponse(
         res,
         400,
         false,
-        error.message || "Image upload failed"
+        error.message || "File upload failed"
       );
     }
 
-    // Ensure that files were uploaded and handle them accordingly
-    if (req.files && Array.isArray(req.files)) {
-      // If multiple files were uploaded, store the URLs in imageUrls
-      req.body.imageUrls = (req.files as Express.MulterS3.File[]).map(
+    // Handle uploaded images
+    if (req.files && "images" in req.files) {
+      req.body.imageUrls = (req.files["images"] as Express.MulterS3.File[]).map(
         (file) => file.location
       );
-    } else if (req.file) {
-      // If a single file was uploaded, store the URL in imageUrl
-      req.body.imageUrl = (req.file as Express.MulterS3.File).location;
     }
 
-    // Proceed to the next middleware or handler
+    // Handle uploaded video
+    if (req.files && "video" in req.files) {
+      req.body.videoUrl = (req.files["video"] as Express.MulterS3.File[])[0].location;
+    }
+
     next();
   });
 };
