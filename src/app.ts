@@ -10,6 +10,7 @@ import {
 } from "./routes/adminProduct.route";
 import adminSupplierRoute from "./routes/adminSupplier.route";
 import adminUserRoute from "./routes/adminUser.route";
+import blogRoute from "./routes/blog.route";
 import cartRoute from "./routes/cart.route";
 import categoryRoute from "./routes/category.route";
 import checkoutRoute from "./routes/checkout.route";
@@ -65,5 +66,6 @@ app.use("/api/v1/payment", paymentRoute);
 app.use("/api/v1/contact", contactRoute);
 app.use("/api/v1/reels", reelRoute);
 app.use("/api/v1/admin", adminRouter);
+app.use("/api/v1/blogs", blogRoute);
 
 export default app;
