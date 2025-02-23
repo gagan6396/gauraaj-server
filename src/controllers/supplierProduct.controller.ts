@@ -1,4 +1,3 @@
-// controllers/product.controller.ts
 import { Response } from "express";
 import mongoose from "mongoose";
 import categoryModel from "../models/Category.model";
@@ -18,14 +17,15 @@ interface UpdateProductData {
   dimensions?: string;
   sku?: string;
   images?: string[];
-  video?: string; // New field for video URL
+  video?: string;
 }
 
 // Supplier Product Management
 const addProductBySupplier = async (req: any, res: Response) => {
   try {
+    // const { supplierId } = req.params;
     const supplierId = req?.user?.id;
-
+    // Validate JSON and parse it
     if (!req.body.data || typeof req.body.data !== "string") {
       return apiResponse(res, 400, false, "Invalid or missing 'data' field");
     }
@@ -42,9 +42,12 @@ const addProductBySupplier = async (req: any, res: Response) => {
       weight,
       dimensions,
       sku,
-      video, // Optional video URL from JSON data
+      video,
     } = JSON.parse(req.body.data);
 
+    const videoUrl = req.body.videoUrl || video;
+
+    // Ensure image URLs are added from the upload middleware
     let imageUrls: string[] = [];
     if (req.body.imageUrls && Array.isArray(req.body.imageUrls)) {
       imageUrls = req.body.imageUrls;
@@ -52,32 +55,49 @@ const addProductBySupplier = async (req: any, res: Response) => {
       imageUrls = [req.body.imageUrl];
     }
 
-    const videoUrl = req.body.videoUrl || video; // Use uploaded video URL if present, otherwise from JSON data
+    console.log(imageUrls);
 
     if (!mongoose.isValidObjectId(supplierId)) {
       return apiResponse(res, 400, false, "Invalid supplier ID format");
     }
 
+    // Validate required fields
     if (
       !name ||
       !description ||
       !price ||
       !stock ||
       !category_id ||
+      // !skuParameters ||
       !brand ||
       !weight ||
       !dimensions ||
       !sku ||
       !imageUrls.length
     ) {
-      return apiResponse(res, 400, false, "Please fill all the required fields");
+      return apiResponse(
+        res,
+        400,
+        false,
+        "Please fill all the required fields"
+      );
     }
 
+    // Validate SKU parameters
+    // if (
+    //   !Object.keys(skuParameters).length ||
+    //   Object.values(skuParameters).some((param: any) => !Array.isArray(param))
+    // ) {
+    //   return apiResponse(res, 400, false, "Invalid SKU parameters format");
+    // }
+
+    // Check if SKU already exists
     const skuExists = await productModel.findOne({ sku });
     if (skuExists) {
       return apiResponse(res, 400, false, "SKU must be unique");
     }
 
+    // Validate supplier existence and approval status
     const supplier = await supplierModel.findById(supplierId);
     if (!supplier) {
       return apiResponse(res, 404, false, "Supplier not found");
@@ -87,11 +107,13 @@ const addProductBySupplier = async (req: any, res: Response) => {
       return apiResponse(res, 403, false, "Supplier is not approved");
     }
 
+    // Validate category existence
     const category = await categoryModel.findById(category_id);
     if (!category) {
       return apiResponse(res, 404, false, "Category not found");
     }
 
+    // Validate subcategory existence (if provided)
     if (subcategory_id) {
       if (!mongoose.isValidObjectId(subcategory_id)) {
         return apiResponse(res, 400, false, "Invalid subcategory ID");
@@ -103,10 +125,16 @@ const addProductBySupplier = async (req: any, res: Response) => {
       });
 
       if (!subCategory) {
-        return apiResponse(res, 404, false, "Subcategory not found or does not belong to the specified category");
+        return apiResponse(
+          res,
+          404,
+          false,
+          "Subcategory not found or does not belong to the specified category"
+        );
       }
     }
 
+    // Check for duplicate product
     const existingProduct = await productModel.findOne({
       supplier_id: supplierId,
       name,
@@ -119,6 +147,7 @@ const addProductBySupplier = async (req: any, res: Response) => {
       return apiResponse(res, 400, false, "Product already exists");
     }
 
+    // Create a new product with the uploaded images
     const newProduct = new productModel({
       supplier_id: supplierId,
       category_id,
@@ -127,22 +156,27 @@ const addProductBySupplier = async (req: any, res: Response) => {
       description,
       price: mongoose.Types.Decimal128.fromString(price.toString()),
       stock,
-      images: imageUrls,
-      video: videoUrl, // Set video field from either upload or JSON data
+      images: imageUrls, // Store the uploaded image URLs here
       reviews: [],
       rating: 0,
+      // skuParameters,
+      video: videoUrl,
       brand,
       weight,
       dimensions,
       sku,
     });
 
+    // Save the product to the database
     const savedProduct = await newProduct.save();
 
+    // Add the product to the supplier's product list
     supplier.products.push(savedProduct._id);
     await supplier.save();
 
-    return apiResponse(res, 201, true, "Product added successfully", { product: savedProduct });
+    return apiResponse(res, 201, true, "Product added successfully", {
+      product: savedProduct,
+    });
   } catch (error) {
     console.error("Error while adding product by supplier:", error);
     return apiResponse(res, 500, false, "Internal Server Error");
@@ -164,18 +198,25 @@ const updateProductBySupplier = async (req: any, res: Response) => {
     }
 
     if (product.supplier_id.toString() !== supplierId) {
-      return apiResponse(res, 403, false, "Access Denied: You can only update your own products");
+      return apiResponse(
+        res,
+        403,
+        false,
+        "Access Denied: You can only update your own products"
+      );
     }
 
     let updateData: UpdateProductData = {};
     let imageUrls: string[] = [];
 
+    // Handle image URLs from request body
     if (req.body.imageUrls && Array.isArray(req.body.imageUrls)) {
       imageUrls = req.body.imageUrls;
     } else if (req.body.imageUrl) {
       imageUrls = [req.body.imageUrl];
     }
 
+    // Parse and update product data
     if (req.body.data) {
       try {
         const parsedData = JSON.parse(req.body.data);
@@ -190,9 +231,9 @@ const updateProductBySupplier = async (req: any, res: Response) => {
           brand: parsedData.brand || product.brand,
           weight: parsedData.weight || product.weight,
           dimensions: parsedData.dimensions || product.dimensions,
-          video: req.body.videoUrl || parsedData.video || product.video, // Use uploaded video URL or from JSON data
         };
 
+        // Handle SKU uniqueness check
         if (parsedData.sku && parsedData.sku !== product.sku) {
           const existingProductWithSKU = await productModel.findOne({
             sku: parsedData.sku,
@@ -205,15 +246,22 @@ const updateProductBySupplier = async (req: any, res: Response) => {
           updateData.sku = parsedData.sku;
         }
 
+        // Combine image URLs
         updateData.images = [
           ...(Array.isArray(imageUrls) ? imageUrls : []),
           ...(Array.isArray(parsedData?.oldImages) ? parsedData.oldImages : []),
         ];
       } catch (error) {
-        return apiResponse(res, 400, false, "Invalid data format in 'data' field");
+        return apiResponse(
+          res,
+          400,
+          false,
+          "Invalid data format in 'data' field"
+        );
       }
     }
 
+    // Update the product
     const updatedProduct = await productModel.findByIdAndUpdate(
       productId,
       { $set: updateData },
@@ -224,7 +272,13 @@ const updateProductBySupplier = async (req: any, res: Response) => {
       return apiResponse(res, 404, false, "Failed to update product");
     }
 
-    return apiResponse(res, 200, true, "Product updated successfully", updatedProduct);
+    return apiResponse(
+      res,
+      200,
+      true,
+      "Product updated successfully",
+      updatedProduct
+    );
   } catch (error) {
     console.error("Error updating product by supplier:", error);
     return apiResponse(res, 500, false, "Internal server error");
@@ -242,10 +296,21 @@ const getAllSupplierProducts = async (req: any, res: Response) => {
     const products = await productModel.find({ supplier_id: supplierId });
 
     if (!products || products.length === 0) {
-      return apiResponse(res, 404, false, "No products found for this supplier.");
+      return apiResponse(
+        res,
+        404,
+        false,
+        "No products found for this supplier."
+      );
     }
 
-    return apiResponse(res, 200, true, "Products retrieved successfully", products);
+    return apiResponse(
+      res,
+      200,
+      true,
+      "Products retrieved successfully",
+      products
+    );
   } catch (error) {
     console.error("Error fetching supplier products", error);
     return apiResponse(res, 500, false, "Internal server error.");
@@ -258,7 +323,12 @@ const deleteProductBySupplier = async (req: any, res: Response) => {
     const supplierId = req?.user?.id;
 
     if (!supplierId || !productId) {
-      return apiResponse(res, 400, false, "Supplier ID and Product ID are required.");
+      return apiResponse(
+        res,
+        400,
+        false,
+        "Supplier ID and Product ID are required."
+      );
     }
 
     const product = await productModel.findOne({
@@ -267,9 +337,15 @@ const deleteProductBySupplier = async (req: any, res: Response) => {
     });
 
     if (!product) {
-      return apiResponse(res, 404, false, "Product not found or doesn't belong to this supplier.");
+      return apiResponse(
+        res,
+        404,
+        false,
+        "Product not found or doesn't belong to this supplier."
+      );
     }
 
+    // Delete the product
     await productModel.deleteOne({ _id: productId });
 
     return apiResponse(res, 200, true, "Product deleted successfully");
@@ -283,9 +359,15 @@ const getProductById = async (req: any, res: Response) => {
   const { productId } = req.params;
   const supplierId = req?.user?.id;
 
+  console.log("supplierId, productId", supplierId, productId);
   try {
     if (!supplierId || !productId) {
-      return apiResponse(res, 400, false, "Supplier ID and Product ID are required.");
+      return apiResponse(
+        res,
+        400,
+        false,
+        "Supplier ID and Product ID are required."
+      );
     }
 
     const product = await productModel.findOne({
@@ -294,12 +376,17 @@ const getProductById = async (req: any, res: Response) => {
     });
 
     if (!product) {
-      return apiResponse(res, 404, false, "Product not found or doesn't belong to this supplier.");
+      return apiResponse(
+        res,
+        404,
+        false,
+        "Product not found or doesn't belong to this supplier."
+      );
     }
 
     return apiResponse(res, 200, true, "Product fetched successfully", product);
   } catch (error) {
-    console.error("Error fetching product by supplier:", error);
+    console.error("Error fetched product by supplier:", error);
     return apiResponse(res, 500, false, "Internal server error");
   }
 };
