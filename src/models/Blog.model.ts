@@ -5,7 +5,7 @@ interface IBlog extends Document {
   title: string;
   content: string;
   author: mongoose.Schema.Types.ObjectId;
-  category: mongoose.Schema.Types.ObjectId;
+  category: string;
   sequence: number;
   isPinned: boolean;
   isHidden: boolean;
@@ -22,7 +22,7 @@ const BlogSchema = new Schema<IBlog>(
     title: { type: String, required: true, trim: true },
     content: { type: String, required: true },
     author: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    category: { type: Schema.Types.ObjectId, ref: "Category", required: true },
+    category: { type: String, required: true },
     sequence: { type: Number, default: 0 }, // For ordering blogs
     isPinned: { type: Boolean, default: false }, // Pin to top
     isHidden: { type: Boolean, default: false }, // Hide from public view

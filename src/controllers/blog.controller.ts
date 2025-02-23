@@ -17,10 +17,10 @@ export const createBlog = async (req: any, res: Response) => {
       isPinned,
       isHidden,
       tags,
-      imageUrl,
+      imageUrls,
     } = req.body;
     const author = req.user?.id; // Assuming authMiddleware sets req.user
-
+    const imageUrl = req.body.imageUrls[0] || "";
     if (!title || !content || !category || !author) {
       return apiResponse(
         res,
@@ -48,7 +48,7 @@ export const createBlog = async (req: any, res: Response) => {
       title,
       content,
       author,
-      category,
+      category: [category],
       sequence: sequence || 0,
       isPinned: isPinned || false,
       isHidden: isHidden || false,
