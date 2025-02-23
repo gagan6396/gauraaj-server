@@ -25,13 +25,13 @@ export const createBlog = async (req: any, res: Response) => {
 
     console.log(
       "title",
-      req.body.data.title,
+      title,
       "content",
-      req.body.data.content,
+      content,
       "category",
-      req.body.data.category,
+      category,
       "author",
-      req.body.data.author,
+      author,
       "imageUrl",
       imageUrl
     );
