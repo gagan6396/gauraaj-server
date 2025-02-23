@@ -9,16 +9,8 @@ import apiResponse from "../utils/ApiResponse";
  */
 export const createBlog = async (req: any, res: Response) => {
   try {
-    const {
-      title,
-      content,
-      category,
-      sequence,
-      isPinned,
-      isHidden,
-      tags,
-      imageUrls,
-    } = JSON.parse(req.body.data);
+    const { title, content, category, sequence, isPinned, isHidden, tags } =
+      JSON.parse(req.body.data);
     const author = req.user?.id; // Assuming authMiddleware sets req.user
     const imageUrl = req.body.imageUrls[0] || "";
     console.log("req.body", req.body.data);
@@ -63,7 +55,7 @@ export const createBlog = async (req: any, res: Response) => {
       title,
       content,
       author,
-      category: [category],
+      category: category,
       sequence: sequence || 0,
       isPinned: isPinned || false,
       isHidden: isHidden || false,
