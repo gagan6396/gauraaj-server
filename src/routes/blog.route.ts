@@ -10,6 +10,7 @@ import {
     updateBlog,
 } from "../controllers/blog.controller";
 import authMiddleware from "../middlewares/authMiddleware"; // Assuming authentication is required
+import handleImageUpload from "../middlewares/imageMiddleware";
 
 const blogRoute = Router();
 
@@ -18,8 +19,8 @@ blogRoute.get("/", getBlogs);
 blogRoute.get("/:id", getBlogById);
 
 // Protected routes (admin only)
-blogRoute.post("/", authMiddleware, createBlog);
-blogRoute.patch("/:id", authMiddleware, updateBlog);
+blogRoute.post("/", authMiddleware, handleImageUpload, createBlog);
+blogRoute.patch("/:id", authMiddleware, handleImageUpload, updateBlog);
 blogRoute.delete("/:id", authMiddleware, deleteBlog);
 blogRoute.patch("/:id/toggle-pin", authMiddleware, togglePinBlog);
 blogRoute.patch("/:id/toggle-hide", authMiddleware, toggleHideBlog);
