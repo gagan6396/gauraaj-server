@@ -1,3 +1,4 @@
+// models/Product.model.ts
 import mongoose, { Document, Schema } from "mongoose";
 
 export interface Product extends Document {
@@ -10,16 +11,17 @@ export interface Product extends Document {
   price: mongoose.Types.Decimal128;
   stock: number;
   images: string[];
+  video?: string; // New field for video URL
   rating: number;
   brand: string;
-  weight: number; // Weight in kilograms
+  weight: number;
   dimensions: {
-    height: number; // Height in cm
-    length: number; // Length in cm
-    width: number; // Width in cm
+    height: number;
+    length: number;
+    width: number;
   };
-  sku: string; // Stock Keeping Unit
-  skuParameters?: Record<string, string[]>; // Dynamic SKU parameters
+  sku: string;
+  skuParameters?: Record<string, string[]>;
 }
 
 const productSchema: Schema<Product> = new mongoose.Schema(
@@ -36,7 +38,7 @@ const productSchema: Schema<Product> = new mongoose.Schema(
     },
     subcategory_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Category", // Assuming subcategories are stored in the same collection as categories
+      ref: "Category",
       default: null,
     },
     reviews: [
@@ -59,8 +61,7 @@ const productSchema: Schema<Product> = new mongoose.Schema(
       type: mongoose.Schema.Types.Decimal128,
       required: true,
       validate: {
-        validator: (value: mongoose.Types.Decimal128) =>
-          parseFloat(value.toString()) > 0,
+        validator: (value: mongoose.Types.Decimal128) => parseFloat(value.toString()) > 0,
         message: "Price must be greater than zero.",
       },
     },
@@ -72,6 +73,11 @@ const productSchema: Schema<Product> = new mongoose.Schema(
     images: {
       type: [String],
       required: true,
+    },
+    video: {
+      type: String,
+      trim: true,
+      default: null, // Optional field for video URL
     },
     rating: {
       type: Number,
@@ -109,8 +115,6 @@ const productSchema: Schema<Product> = new mongoose.Schema(
     sku: {
       type: String,
       required: true,
-      // unique: true,
-      // trim: true,
     },
     skuParameters: {
       type: Map,
