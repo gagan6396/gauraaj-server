@@ -18,7 +18,7 @@ export const createBlog = async (req: any, res: Response) => {
       isHidden,
       tags,
       imageUrls,
-    } = req.body.data;
+    } = JSON.parse(req.body.data);
     const author = req.user?.id; // Assuming authMiddleware sets req.user
     const imageUrl = req.body.imageUrls[0] || "";
     console.log("req.body", req.body.data);
