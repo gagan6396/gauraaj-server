@@ -1,4 +1,3 @@
-// utils/uploadImage.ts
 import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import multer from "multer";
 import multerS3 from "multer-s3";
@@ -12,54 +11,51 @@ const s3Client = new S3Client({
   },
 });
 
-// Base Multer configuration for S3
-const multerS3Config = {
-  s3: s3Client,
-  bucket: process.env.AWS_BUCKET_NAME || "your-bucket-name",
-  acl: "public-read",
-  key: (req: any, file: { originalname: any; }, cb: (arg0: null, arg1: string) => void) => {
-    const uniqueFileName = `${Date.now()}-${file.originalname}`;
-    cb(null, uniqueFileName);
-  },
-};
-
-// Image-specific upload configuration
-const uploadImages = multer({
-  storage: multerS3(multerS3Config),
+// Configure Multer storage with AWS S3 for SDK v3
+const upload = multer({
+  storage: multerS3({
+    s3: s3Client,
+    bucket: process.env.AWS_BUCKET_NAME || "your-bucket-name",
+    acl: "public-read",
+    key: (req, file, cb) => {
+      const uniqueFileName = `${Date.now()}-${file.originalname}`;
+      cb(null, uniqueFileName);
+    },
+  }),
   fileFilter: (req, file, cb) => {
     if (file && file.mimetype) {
       const mimeType = file.mimetype.toLowerCase();
       const fileExtension =
         file.originalname.split(".").pop()?.toLowerCase() || "";
 
-      const allowedImageTypes = ["image/jpeg", "image/png", "image/jpg"];
-      const allowedImageExtensions = ["jpg", "jpeg", "png"];
-
       if (
-        allowedImageTypes.includes(mimeType) ||
-        allowedImageExtensions.includes(fileExtension)
+        ["jpg", "jpeg", "png"].includes(fileExtension) ||
+        ["image/jpeg", "image/png", "image/jpg"].includes(mimeType)
       ) {
         cb(null, true);
       } else {
         cb(
-          new Error(
-            "Invalid file type. Only JPG, JPEG, and PNG are allowed for images."
-          )
+          new Error("Invalid file type. Only JPG, JPEG, and PNG are allowed.")
         );
       }
     } else {
-      cb(new Error("No image file provided"));
+      cb(new Error("No file provided"));
     }
   },
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5 MB for images
-    files: 5, // Max 5 images
-  },
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB file size limit per file
 });
 
 // Video-specific upload configuration
 const uploadVideos = multer({
-  storage: multerS3(multerS3Config),
+  storage: multerS3({
+    s3: s3Client,
+    bucket: process.env.AWS_BUCKET_NAME || "your-bucket-name",
+    acl: "public-read",
+    key: (req, file, cb) => {
+      const uniqueFileName = `${Date.now()}-${file.originalname}`;
+      cb(null, uniqueFileName);
+    },
+  }),
   fileFilter: (req, file, cb) => {
     if (file && file.mimetype) {
       const mimeType = file.mimetype.toLowerCase();
@@ -87,16 +83,14 @@ const uploadVideos = multer({
   },
 });
 
-// Middleware to upload multiple images
-export const uploadMultipleImages = uploadImages.array("images", 5);
-
 // Middleware to upload a single video
 export const uploadVideo = uploadVideos.single("video");
 
-// Function to delete a file (image or video) from S3
-export const deleteImageFromS3 = async (fileUrl: string) => {
+export const uploadMultipleImages = upload.array("images", 5); // 5 images max per product
+
+export const deleteImageFromS3 = async (imageUrl: string) => {
   try {
-    const url = new URL(fileUrl);
+    const url = new URL(imageUrl);
     const key = url.pathname.substring(1); // Remove the leading '/'
 
     const deleteParams = {
@@ -105,8 +99,8 @@ export const deleteImageFromS3 = async (fileUrl: string) => {
     };
 
     await s3Client.send(new DeleteObjectCommand(deleteParams));
-    console.log(`Deleted file from S3: ${fileUrl}`);
+    console.log(`Deleted image from S3: ${imageUrl}`);
   } catch (error) {
-    console.error(`Error deleting file from S3: ${fileUrl}`, error);
+    console.error(`Error deleting image from S3: ${imageUrl}`, error);
   }
 };
