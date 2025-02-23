@@ -183,6 +183,23 @@ const addProductBySupplier = async (req: any, res: Response) => {
   }
 };
 
+// controllers/product.controller.ts (partial update)
+
+interface UpdateProductData {
+  name?: string;
+  description?: string;
+  price?: number;
+  stock?: number;
+  category_id?: string;
+  subcategory_id?: string;
+  brand?: string;
+  weight?: number;
+  dimensions?: string;
+  sku?: string;
+  images?: string[];
+  video?: string; // New field for video URL
+}
+
 const updateProductBySupplier = async (req: any, res: Response) => {
   try {
     const supplierId = req?.user?.id;
@@ -209,14 +226,17 @@ const updateProductBySupplier = async (req: any, res: Response) => {
     let updateData: UpdateProductData = {};
     let imageUrls: string[] = [];
 
-    // Handle image URLs from request body
+    // Handle image URLs from request body (uploaded images)
     if (req.body.imageUrls && Array.isArray(req.body.imageUrls)) {
       imageUrls = req.body.imageUrls;
     } else if (req.body.imageUrl) {
       imageUrls = [req.body.imageUrl];
     }
 
-    // Parse and update product data
+    // Handle video URL from uploaded file
+    const videoUrl = req.body.videoUrl;
+
+    // Parse and update product data from JSON payload
     if (req.body.data) {
       try {
         const parsedData = JSON.parse(req.body.data);
@@ -231,6 +251,7 @@ const updateProductBySupplier = async (req: any, res: Response) => {
           brand: parsedData.brand || product.brand,
           weight: parsedData.weight || product.weight,
           dimensions: parsedData.dimensions || product.dimensions,
+          video: videoUrl || parsedData.video || product.video, // Prioritize uploaded video, then JSON data, then existing
         };
 
         // Handle SKU uniqueness check
@@ -246,7 +267,7 @@ const updateProductBySupplier = async (req: any, res: Response) => {
           updateData.sku = parsedData.sku;
         }
 
-        // Combine image URLs
+        // Combine image URLs (uploaded + oldImages from JSON)
         updateData.images = [
           ...(Array.isArray(imageUrls) ? imageUrls : []),
           ...(Array.isArray(parsedData?.oldImages) ? parsedData.oldImages : []),
