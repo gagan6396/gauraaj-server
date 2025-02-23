@@ -21,6 +21,7 @@ export const createBlog = async (req: any, res: Response) => {
     } = req.body;
     const author = req.user?.id; // Assuming authMiddleware sets req.user
     const imageUrl = req.body.imageUrls[0] || "";
+    console.log("req.body", req.body);
 
     console.log(
       "title",
