@@ -93,6 +93,7 @@ const getAllProducts = async (req: any, res: Response) => {
           price: 1,
           stock: 1,
           skuParameters: 1,
+          video: 1,
           images: 1,
           rating: 1,
           color: 1,
@@ -498,6 +499,10 @@ const filterProduct = async (req: Request, res: Response) => {
 
 export {
   filterProduct,
-  getAllProducts, getAllProductsWithOutAuth, getProductById, getProductByIdWithOutAuth, searchProduct
+  getAllProducts,
+  getAllProductsWithOutAuth,
+  getProductById,
+  getProductByIdWithOutAuth,
+  searchProduct
 };
 
