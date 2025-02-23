@@ -133,18 +133,14 @@ export const getBlogById = async (req: any, res: Response) => {
  * @desc Update a blog
  * @route PATCH /api/blogs/:id
  */
-export const updateBlog = async (req: Request, res: Response) => {
+export const updateBlog = async (req: any, res: Response) => {
   try {
-    const {
-      title,
-      content,
-      category,
-      sequence,
-      isPinned,
-      isHidden,
-      tags,
-      imageUrl,
-    } = req.body;
+    const { title, content, category, sequence, isPinned, isHidden, tags } =
+      JSON.parse(req.body.data);
+
+    const author = req.user?.id; // Assuming authMiddleware sets req.user
+    const imageUrl = req.body.imageUrls[0] || "";
+    console.log("req.body", req.body.data);
 
     const blog: any = await Blog.findById(req.params.id);
     if (!blog) {
