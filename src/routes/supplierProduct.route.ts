@@ -8,6 +8,7 @@ import {
 } from "../controllers/supplierProduct.controller";
 import authMiddleware from "../middlewares/authMiddleware";
 import handleImageUpload from "../middlewares/imageMiddleware";
+import handleVideoUpload from "../middlewares/videoMiddleware";
 
 const supplierProductRoute = Router();
 
@@ -16,12 +17,14 @@ supplierProductRoute.post(
   "/",
   authMiddleware,
   handleImageUpload,
+  handleVideoUpload,
   addProductBySupplier
 );
 supplierProductRoute.patch(
   "/:productId",
   authMiddleware,
   handleImageUpload,
+  handleVideoUpload,
   updateProductBySupplier
 );
 supplierProductRoute.delete(
