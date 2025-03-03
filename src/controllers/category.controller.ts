@@ -530,7 +530,7 @@ const updateSubCategory = async (req: Request, res: Response) => {
       return apiResponse(res, 400, false, "'data' field is required");
     }
 
-    if (req.body.imageUrls.length !== 0) {
+    if (req.body.imageUrls) {
       updateData.images = req.body.imageUrls;
     }
 
