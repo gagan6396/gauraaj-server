@@ -11,8 +11,8 @@ const cartRoute = Router();
 
 // Define here the cart Routes
 cartRoute.get("/", authMiddleware, getUserCart);
-cartRoute.post("/:productId", authMiddleware, addProductToCart);
-cartRoute.put("/:productId", authMiddleware, updateCart);
-cartRoute.delete("/:productId", authMiddleware, deleteProductFromCart);
+cartRoute.post("/:productId/:variantId", authMiddleware, addProductToCart);
+cartRoute.put("/:productId/:variantId", authMiddleware, updateCart);
+cartRoute.delete("/:productId/:variantId", authMiddleware, deleteProductFromCart);
 
 export default cartRoute;

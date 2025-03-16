@@ -4,8 +4,8 @@ export interface Cart extends Document {
   userId: mongoose.Types.ObjectId;
   products: {
     productId: mongoose.Types.ObjectId;
+    variantId: mongoose.Types.ObjectId; // Added to reference a specific variant
     quantity: number;
-    skuParameters?: Record<string, string>;
   }[];
   createdAt: Date;
   updatedAt: Date;
@@ -26,15 +26,14 @@ const CartSchema: Schema<Cart> = new Schema(
           ref: "Product",
           required: true,
         },
+        variantId: {
+          type: mongoose.Schema.Types.ObjectId,
+          required: true, // Reference to the specific variant
+        },
         quantity: {
           type: Number,
           required: true,
           min: [1, "Quantity must be at least 1"],
-        },
-        skuParameters: {
-          type: Map,
-          of: String,
-          default: {},
         },
       },
     ],
