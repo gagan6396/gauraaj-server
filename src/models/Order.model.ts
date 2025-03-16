@@ -1,13 +1,13 @@
+// models/Order.model.ts
 import mongoose, { Document, Schema } from "mongoose";
 
-// Define Order interface extending Document
 export interface Order extends Document {
   user_id: mongoose.Types.ObjectId;
   orderDate: Date;
   totalAmount: number;
   orderStatus:
     | "Pending"
-    | "Confirmed" // Added "Confirmed"
+    | "Confirmed"
     | "Shipped"
     | "Delivered"
     | "Cancelled"
@@ -20,7 +20,10 @@ export interface Order extends Document {
     | "Returned";
   products: {
     productId: mongoose.Types.ObjectId;
+    variantId: string; // Variant SKU or identifier
     quantity: number;
+    price: number; // Price of the variant at the time of order
+    name: string; // Product name + variant name for reference
     skuParameters?: Record<string, string>;
   }[];
   shipRocketOrderId?: number;
@@ -28,7 +31,6 @@ export interface Order extends Document {
   payment_id: mongoose.Types.ObjectId;
 }
 
-// Order Schema definition
 const OrderSchema: Schema<Order> = new Schema(
   {
     user_id: {
@@ -49,7 +51,7 @@ const OrderSchema: Schema<Order> = new Schema(
       type: String,
       enum: [
         "Pending",
-        "Confirmed", // Added "Confirmed"
+        "Confirmed",
         "Shipped",
         "Delivered",
         "Cancelled",
@@ -69,10 +71,22 @@ const OrderSchema: Schema<Order> = new Schema(
           ref: "Product",
           required: true,
         },
+        variantId: {
+          type: String, // Use SKU or another unique identifier for the variant
+          required: true,
+        },
         quantity: {
           type: Number,
           required: true,
           min: [1, "Quantity must be at least 1"],
+        },
+        price: {
+          type: Number,
+          required: true,
+        },
+        name: {
+          type: String,
+          required: true,
         },
         skuParameters: {
           type: Map,

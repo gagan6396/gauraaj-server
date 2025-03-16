@@ -35,6 +35,7 @@ interface ShipRocketOrderRequest {
   orderId: string;
   products: {
     productId: string;
+    variantId: string;
     quantity: number;
     selling_price?: number;
     name?: string;
@@ -238,18 +239,24 @@ export const getShipRocketToken = async (): Promise<string> => {
 //   }
 // };
 
-const createShipRocketOrder = async (orderData: ShipRocketOrderRequest): Promise<any> => {
+const createShipRocketOrder = async (
+  orderData: ShipRocketOrderRequest
+): Promise<any> => {
   try {
     const { orderId, products, addressSnapshot } = orderData;
 
     // Validate inputs
-    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+    if (!isValidObjectId(orderId)) {
       throw new Error(`Invalid order ID: ${orderId}`);
     }
     if (!products?.length) {
       throw new Error("No valid products provided");
     }
-    if (!addressSnapshot?.addressLine1 || !addressSnapshot?.postalCode || !addressSnapshot?.city) {
+    if (
+      !addressSnapshot?.addressLine1 ||
+      !addressSnapshot?.postalCode ||
+      !addressSnapshot?.city
+    ) {
       throw new Error("Address snapshot missing required fields");
     }
 
@@ -270,30 +277,54 @@ const createShipRocketOrder = async (orderData: ShipRocketOrderRequest): Promise
 
     const updatedProducts = await Promise.all(
       products.map(async (product) => {
+        console.log("products===>", products);
+
         const productDetails = await productModel.findById(product.productId);
         if (!productDetails) {
           throw new Error(`Product with ID ${product.productId} not found`);
         }
 
-        const sellingPrice = parseFloat(product.selling_price?.toString() || "0");
-        const dimensions = productDetails.dimensions || { length: 10, width: 5, height: 8 };
-        const weight = productDetails.weight || 0.5; // Default weight if missing
+        // Find the variant by variantId
+        console.log("productDetails.variants===>", productDetails.variants);
 
-        totalDimensions.length += dimensions.length * product.quantity || 10;
-        totalDimensions.width += dimensions.width * product.quantity || 5;
-        totalDimensions.height += dimensions.height * product.quantity || 8;
+        const variant = productDetails.variants.find((v: any) =>
+          v._id.equals(product.variantId)
+        );
+
+        if (!variant) {
+          throw new Error(
+            `Variant with ID ${product.variantId} not found for product ${product.productId}`
+          );
+        }
+
+        const sellingPrice = parseFloat(
+          product.selling_price?.toString() || variant.price.toString()
+        );
+        const dimensions = variant.dimensions || {
+          length: 10,
+          width: 5,
+          height: 8,
+        };
+        const weight = variant.weight || 0.5;
+
+        // Accumulate dimensions and weight based on quantity
+        totalDimensions.length += dimensions.length * product.quantity;
+        totalDimensions.width += dimensions.width * product.quantity;
+        totalDimensions.height += dimensions.height * product.quantity;
         totalDimensions.weight += weight * product.quantity;
 
         sub_total += product.quantity * sellingPrice;
 
         return {
-          name: productDetails.name || "Unnamed Product",
-          sku: productDetails.sku || `SKU-${product.productId}`,
+          name: `${productDetails.name} - ${variant.name}` || "Unnamed Product",
+          sku: variant.sku || `SKU-${product.productId}-${variant._id}`,
           units: product.quantity,
           selling_price: sellingPrice,
           discount: product.discount || 0,
           tax: product.tax || 0,
-          sku_parameters: product.skuParameters || {},
+          sku_parameters: product.skuParameters || {
+            weight: variant.weight.toString(),
+          },
         };
       })
     );
@@ -321,7 +352,10 @@ const createShipRocketOrder = async (orderData: ShipRocketOrderRequest): Promise
       weight: totalDimensions.weight || 0.5,
     };
 
-    console.log("ShipRocket Request Payload:", requestBody);
+    console.log(
+      "ShipRocket Request Payload:",
+      JSON.stringify(requestBody, null, 2)
+    );
 
     const token = await getShipRocketToken();
     const response = await axios.post(

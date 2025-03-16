@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import mongoose from "mongoose";
 import Razorpay from "razorpay";
+import CartModel from "../models/Cart.model";
 import orderModel from "../models/Order.model";
 import PaymentModel from "../models/Payment.model";
 import productModel from "../models/Product.model";
@@ -94,6 +95,19 @@ const createOrder = async (req: any, res: Response) => {
       }
     );
 
+    // Update the cart: Remove items that were ordered
+    await CartModel.updateOne(
+      { user_id: userId },
+      {
+        $pull: {
+          items: {
+            productId: { $in: updatedProducts.map((p) => p.productId) },
+            variantId: { $in: updatedProducts.map((p) => p.variantId) },
+          },
+        },
+      }
+    );
+
     return apiResponse(res, 200, true, "Order created successfully", {
       orderId: savedOrder._id,
       totalAmount,
@@ -102,7 +116,6 @@ const createOrder = async (req: any, res: Response) => {
     });
   } catch (error: any) {
     console.error("Order creation failed:", error);
-    // Manual rollback (optional)
     if (error.orderId) {
       await orderModel.deleteOne({ _id: error.orderId });
       await PaymentModel.deleteOne({ orderId: error.orderId });
@@ -121,39 +134,47 @@ const processProducts = async (products: any[]) => {
   const updatedProducts = [];
 
   for (const item of products) {
-    const { productId, quantity } = item;
+    const { productId, variantId, quantity } = item;
 
-    if (!mongoose.Types.ObjectId.isValid(productId) || quantity < 1) {
-      throw new Error("Invalid product ID or quantity");
+    if (
+      !mongoose.Types.ObjectId.isValid(productId) ||
+      !variantId ||
+      quantity < 1
+    ) {
+      throw new Error("Invalid product ID, variant ID, or quantity");
     }
 
     const product = await productModel.findById(productId);
     if (!product) {
       throw new Error(`Product not found: ${productId}`);
     }
-    if (product.stock < quantity) {
-      throw new Error(`Insufficient stock for "${product.name}"`);
+
+    console.log(product.variants);
+    const variant = product.variants.find((v: any) => v._id.equals(variantId));
+    if (!variant) {
+      throw new Error(
+        `Variant not found: ${variantId} for product ${productId}`
+      );
+    }
+    if (variant.stock < quantity) {
+      throw new Error(
+        `Insufficient stock for "${product.name} - ${variant.name}"`
+      );
     }
 
-    const discount = item.discount || 0;
-    const tax = item.tax || 0;
-    const priceAfterDiscount = product.price - (product.price * discount) / 100;
-    const finalPrice = priceAfterDiscount + (priceAfterDiscount * tax) / 100;
-
-    totalAmount += finalPrice * quantity;
+    const price = parseFloat(variant.price.toString());
+    totalAmount += price * quantity;
 
     updatedProducts.push({
       productId: productId,
+      variantId: variant._id,
       quantity,
-      selling_price: product.price,
-      name: product.name,
-      sku: product.sku,
-      discount,
-      tax,
-      dimensions: product.dimensions,
+      price,
+      name: `${product.name} - ${variant.name}`,
+      skuParameters: { weight: variant.weight.toString() }, // Example
     });
 
-    product.stock -= quantity;
+    variant.stock -= quantity;
     await product.save();
   }
 
