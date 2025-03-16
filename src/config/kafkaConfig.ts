@@ -1,8 +1,9 @@
 import { Kafka } from "kafkajs";
 
+// Use environment variable for broker address, default to localhost:9092 for local dev if needed
 const kafka = new Kafka({
   clientId: "shiprocket-service",
-  brokers: ["localhost:9092"],
+  brokers: [process.env.KAFKA_BROKER || "localhost:9092"],
 });
 
 export const producer = kafka.producer();
@@ -53,6 +54,14 @@ export const sendMessageToKafka = async (topic: string, message: any) => {
 // Event listener for producer errors
 producer.on("producer.connect", () => {
   console.log("Kafka Producer connected successfully.");
+});
+
+producer.on("producer.disconnect", () => {
+  console.log("Kafka Producer disconnected.");
+});
+
+producer.on("producer.network.request_timeout", (event) => {
+  console.error("Kafka Producer request timeout:", event);
 });
 
 // Ensure Kafka Producer is connected before using it in other parts of your application
