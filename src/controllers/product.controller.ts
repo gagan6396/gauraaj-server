@@ -32,6 +32,7 @@ const getAllProductsWithOutAuth = async (req: any, res: Response) => {
           brand: 1,
           sku: 1,
           createdAt: 1,
+          variants: 1,
         }
       )
       .populate({
@@ -102,6 +103,7 @@ const getAllProducts = async (req: any, res: Response) => {
           brand: 1,
           sku: 1,
           createdAt: 1,
+          variants: 1,
         }
       )
       .populate({

@@ -4,28 +4,35 @@ import categoryModel from "../models/Category.model";
 import productModel from "../models/Product.model";
 import supplierModel from "../models/Supplier.model";
 import apiResponse from "../utils/ApiResponse";
+interface VariantData {
+  name: string;
+  price: number;
+  stock: number;
+  weight: number;
+  dimensions: {
+    height: number;
+    length: number;
+    width: number;
+  };
+  sku: string;
+  images?: string[];
+}
 
 interface UpdateProductData {
   name?: string;
   description?: string;
-  price?: number;
-  stock?: number;
+  variants?: VariantData[];
   category_id?: string;
   subcategory_id?: string;
   brand?: string;
-  weight?: number;
-  dimensions?: string;
-  sku?: string;
   images?: string[];
   video?: string;
 }
 
-// Supplier Product Management
 const addProductBySupplier = async (req: any, res: Response) => {
   try {
-    // const { supplierId } = req.params;
     const supplierId = req?.user?.id;
-    // Validate JSON and parse it
+
     if (!req.body.data || typeof req.body.data !== "string") {
       return apiResponse(res, 400, false, "Invalid or missing 'data' field");
     }
@@ -33,29 +40,20 @@ const addProductBySupplier = async (req: any, res: Response) => {
     const {
       name,
       description,
-      price,
-      stock,
+      variants,
       category_id,
       subcategory_id,
-      skuParameters,
       brand,
-      weight,
-      dimensions,
-      sku,
       video,
     } = JSON.parse(req.body.data);
 
     const videoUrl = req.body.videoUrl || video;
-
-    // Ensure image URLs are added from the upload middleware
     let imageUrls: string[] = [];
     if (req.body.imageUrls && Array.isArray(req.body.imageUrls)) {
       imageUrls = req.body.imageUrls;
     } else if (req.body.imageUrl) {
       imageUrls = [req.body.imageUrl];
     }
-
-    console.log(imageUrls);
 
     if (!mongoose.isValidObjectId(supplierId)) {
       return apiResponse(res, 400, false, "Invalid supplier ID format");
@@ -65,112 +63,84 @@ const addProductBySupplier = async (req: any, res: Response) => {
     if (
       !name ||
       !description ||
-      !price ||
-      !stock ||
+      !variants ||
       !category_id ||
-      // !skuParameters ||
       !brand ||
-      !weight ||
-      !dimensions ||
-      !sku ||
       !imageUrls.length
     ) {
-      return apiResponse(
-        res,
-        400,
-        false,
-        "Please fill all the required fields"
-      );
+      return apiResponse(res, 400, false, "Please fill all required fields");
     }
 
-    // Validate SKU parameters
-    // if (
-    //   !Object.keys(skuParameters).length ||
-    //   Object.values(skuParameters).some((param: any) => !Array.isArray(param))
-    // ) {
-    //   return apiResponse(res, 400, false, "Invalid SKU parameters format");
-    // }
-
-    // Check if SKU already exists
-    const skuExists = await productModel.findOne({ sku });
-    if (skuExists) {
-      return apiResponse(res, 400, false, "SKU must be unique");
+    // Validate variants
+    if (!Array.isArray(variants) || variants.length === 0) {
+      return apiResponse(res, 400, false, "At least one variant is required");
     }
 
-    // Validate supplier existence and approval status
+    for (const variant of variants) {
+      if (
+        !variant.name ||
+        !variant.price ||
+        !variant.stock ||
+        !variant.weight ||
+        !variant.dimensions ||
+        !variant.sku
+      ) {
+        return apiResponse(res, 400, false, "All variant fields are required");
+      }
+
+      // Check SKU uniqueness across all products
+      const skuExists = await productModel.findOne({
+        "variants.sku": variant.sku,
+      });
+      if (skuExists) {
+        return apiResponse(
+          res,
+          400,
+          false,
+          `SKU ${variant.sku} must be unique`
+        );
+      }
+    }
+
     const supplier = await supplierModel.findById(supplierId);
-    if (!supplier) {
-      return apiResponse(res, 404, false, "Supplier not found");
+    if (!supplier || supplier.approval_status !== "Approved") {
+      return apiResponse(res, 403, false, "Supplier not found or not approved");
     }
 
-    if (supplier.approval_status !== "Approved") {
-      return apiResponse(res, 403, false, "Supplier is not approved");
-    }
-
-    // Validate category existence
     const category = await categoryModel.findById(category_id);
     if (!category) {
       return apiResponse(res, 404, false, "Category not found");
     }
 
-    // Validate subcategory existence (if provided)
     if (subcategory_id) {
-      if (!mongoose.isValidObjectId(subcategory_id)) {
-        return apiResponse(res, 400, false, "Invalid subcategory ID");
-      }
-
       const subCategory = await categoryModel.findOne({
         _id: subcategory_id,
         parentCategoryId: category_id,
       });
-
       if (!subCategory) {
-        return apiResponse(
-          res,
-          404,
-          false,
-          "Subcategory not found or does not belong to the specified category"
-        );
+        return apiResponse(res, 404, false, "Invalid subcategory");
       }
     }
 
-    // Check for duplicate product
-    const existingProduct = await productModel.findOne({
-      supplier_id: supplierId,
-      name,
-      category_id,
-      subcategory_id: subcategory_id || null,
-      brand,
-    });
-
-    if (existingProduct) {
-      return apiResponse(res, 400, false, "Product already exists");
-    }
-
-    // Create a new product with the uploaded images
     const newProduct = new productModel({
       supplier_id: supplierId,
       category_id,
       subcategory_id: subcategory_id || null,
       name,
       description,
-      price: mongoose.Types.Decimal128.fromString(price.toString()),
-      stock,
-      images: imageUrls, // Store the uploaded image URLs here
+      variants: variants.map((v: VariantData) => ({
+        ...v,
+        price: mongoose.Types.Decimal128.fromString(v.price.toString()),
+        images: v.images || [],
+      })),
+      images: imageUrls,
       reviews: [],
       rating: 0,
-      // skuParameters,
       video: videoUrl,
       brand,
-      weight,
-      dimensions,
-      sku,
     });
 
-    // Save the product to the database
     const savedProduct = await newProduct.save();
-
-    // Add the product to the supplier's product list
     supplier.products.push(savedProduct._id);
     await supplier.save();
 
@@ -178,120 +148,80 @@ const addProductBySupplier = async (req: any, res: Response) => {
       product: savedProduct,
     });
   } catch (error) {
-    console.error("Error while adding product by supplier:", error);
+    console.error("Error adding product:", error);
     return apiResponse(res, 500, false, "Internal Server Error");
   }
 };
-
-// controllers/product.controller.ts (partial update)
-
-interface UpdateProductData {
-  name?: string;
-  description?: string;
-  price?: number;
-  stock?: number;
-  category_id?: string;
-  subcategory_id?: string;
-  brand?: string;
-  weight?: number;
-  dimensions?: string;
-  sku?: string;
-  images?: string[];
-  video?: string; // New field for video URL
-}
 
 const updateProductBySupplier = async (req: any, res: Response) => {
   try {
     const supplierId = req?.user?.id;
     const { productId } = req.params;
 
-    if (!productId) {
-      return apiResponse(res, 400, false, "Product ID is required");
-    }
-
     const product = await productModel.findById(productId);
-    if (!product) {
-      return apiResponse(res, 404, false, "Product not found");
-    }
-
-    if (product.supplier_id.toString() !== supplierId) {
-      return apiResponse(
-        res,
-        403,
-        false,
-        "Access Denied: You can only update your own products"
-      );
+    if (!product || product.supplier_id.toString() !== supplierId) {
+      return apiResponse(res, 403, false, "Product not found or access denied");
     }
 
     let updateData: UpdateProductData = {};
     let imageUrls: string[] = [];
-
-    // Handle image URLs from request body (uploaded images)
     if (req.body.imageUrls && Array.isArray(req.body.imageUrls)) {
       imageUrls = req.body.imageUrls;
     } else if (req.body.imageUrl) {
       imageUrls = [req.body.imageUrl];
     }
 
-    // Handle video URL from uploaded file
     const videoUrl = req.body.videoUrl;
 
-    // Parse and update product data from JSON payload
     if (req.body.data) {
-      try {
-        const parsedData = JSON.parse(req.body.data);
+      const parsedData = JSON.parse(req.body.data);
 
-        updateData = {
-          name: parsedData.name || product.name,
-          description: parsedData.description || product.description,
-          price: parsedData.price || product.price,
-          stock: parsedData.stock || product.stock,
-          category_id: parsedData.category_id || product.category_id,
-          subcategory_id: parsedData.subcategory_id || product.subcategory_id,
-          brand: parsedData.brand || product.brand,
-          weight: parsedData.weight || product.weight,
-          dimensions: parsedData.dimensions || product.dimensions,
-          video: videoUrl || parsedData.video || product.video, // Prioritize uploaded video, then JSON data, then existing
-        };
+      updateData = {
+        name: parsedData.name || product.name,
+        description: parsedData.description || product.description,
+        category_id: parsedData.category_id || product.category_id,
+        subcategory_id: parsedData.subcategory_id || product.subcategory_id,
+        brand: parsedData.brand || product.brand,
+        video: videoUrl || parsedData.video || product.video,
+      };
 
-        // Handle SKU uniqueness check
-        if (parsedData.sku && parsedData.sku !== product.sku) {
-          const existingProductWithSKU = await productModel.findOne({
-            sku: parsedData.sku,
-            _id: { $ne: productId },
-          });
-
-          if (existingProductWithSKU) {
-            return apiResponse(res, 400, false, "SKU must be unique");
+      if (parsedData.variants) {
+        // Validate variant SKUs
+        for (const variant of parsedData.variants) {
+          if (variant.sku) {
+            const existingProduct = await productModel.findOne({
+              "variants.sku": variant.sku,
+              _id: { $ne: productId },
+            });
+            if (existingProduct) {
+              return apiResponse(
+                res,
+                400,
+                false,
+                `SKU ${variant.sku} must be unique`
+              );
+            }
           }
-          updateData.sku = parsedData.sku;
         }
 
-        // Combine image URLs (uploaded + oldImages from JSON)
-        updateData.images = [
-          ...(Array.isArray(imageUrls) ? imageUrls : []),
-          ...(Array.isArray(parsedData?.oldImages) ? parsedData.oldImages : []),
-        ];
-      } catch (error) {
-        return apiResponse(
-          res,
-          400,
-          false,
-          "Invalid data format in 'data' field"
-        );
+        updateData.variants = parsedData.variants.map((v: VariantData) => ({
+          ...v,
+          price: mongoose.Types.Decimal128.fromString(v.price.toString()),
+          images: v.images || [],
+        }));
       }
+
+      updateData.images = [
+        ...(Array.isArray(imageUrls) ? imageUrls : []),
+        ...(Array.isArray(parsedData?.oldImages) ? parsedData.oldImages : []),
+      ];
     }
 
-    // Update the product
     const updatedProduct = await productModel.findByIdAndUpdate(
       productId,
       { $set: updateData },
       { new: true, runValidators: true }
     );
-
-    if (!updatedProduct) {
-      return apiResponse(res, 404, false, "Failed to update product");
-    }
 
     return apiResponse(
       res,
@@ -301,7 +231,7 @@ const updateProductBySupplier = async (req: any, res: Response) => {
       updatedProduct
     );
   } catch (error) {
-    console.error("Error updating product by supplier:", error);
+    console.error("Error updating product:", error);
     return apiResponse(res, 500, false, "Internal server error");
   }
 };
