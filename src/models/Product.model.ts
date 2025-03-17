@@ -2,7 +2,7 @@
 import mongoose, { Document, Schema } from "mongoose";
 
 export interface Variant {
-  name: string; // e.g., "1kg", "2kg", "400ml", "1L"
+  name: string;
   price: mongoose.Types.Decimal128;
   stock: number;
   weight: number;
@@ -10,9 +10,18 @@ export interface Variant {
     height: number;
     length: number;
     width: number;
+
+    
   };
   sku: string;
   images?: string[];
+  discount?: {
+    type: "percentage" | "flat";
+    value: number;
+    active: boolean;
+    startDate?: Date;
+    endDate?: Date;
+  };
 }
 
 export interface Product extends Document {
@@ -22,11 +31,12 @@ export interface Product extends Document {
   reviews: mongoose.Types.ObjectId[];
   name: string;
   description: string;
-  variants: Variant[]; // Updated to use variants array
-  images: string[];
+  variants: Variant[];
+  images: { url: string; sequence: number }[]; // Updated images with sequence
   video?: string;
   rating: number;
   brand: string;
+  isBestSeller: boolean; // Added best seller flag
 }
 
 const variantSchema = new mongoose.Schema({
@@ -39,7 +49,8 @@ const variantSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.Decimal128,
     required: true,
     validate: {
-      validator: (value: mongoose.Types.Decimal128) => parseFloat(value.toString()) > 0,
+      validator: (value: mongoose.Types.Decimal128) =>
+        parseFloat(value.toString()) > 0,
       message: "Price must be greater than zero.",
     },
   },
@@ -78,6 +89,27 @@ const variantSchema = new mongoose.Schema({
     type: [String],
     default: [],
   },
+  discount: {
+    type: {
+      type: String,
+      enum: ["percentage", "flat"],
+    },
+    value: {
+      type: Number,
+      min: [0, "Discount cannot be negative"],
+      max: [100, "Percentage discount cannot exceed 100"],
+    },
+    active: {
+      type: Boolean,
+      default: false,
+    },
+    startDate: {
+      type: Date,
+    },
+    endDate: {
+      type: Date,
+    },
+  },
 });
 
 const productSchema: Schema<Product> = new mongoose.Schema(
@@ -113,11 +145,20 @@ const productSchema: Schema<Product> = new mongoose.Schema(
       required: true,
       trim: true,
     },
-    variants: [variantSchema], // Array of variants
-    images: {
-      type: [String],
-      required: true,
-    },
+    variants: [variantSchema],
+    images: [
+      {
+        url: {
+          type: String,
+          required: true,
+        },
+        sequence: {
+          type: Number,
+          required: true,
+          min: [0, "Sequence cannot be negative"],
+        },
+      },
+    ],
     video: {
       type: String,
       trim: true,
@@ -133,6 +174,10 @@ const productSchema: Schema<Product> = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+    },
+    isBestSeller: {
+      type: Boolean,
+      default: false,
     },
   },
   {

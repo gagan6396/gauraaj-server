@@ -33,6 +33,7 @@ const getAllProductsWithOutAuth = async (req: any, res: Response) => {
           sku: 1,
           createdAt: 1,
           variants: 1,
+          isBestSeller: 1,
         }
       )
       .populate({
@@ -104,6 +105,7 @@ const getAllProducts = async (req: any, res: Response) => {
           sku: 1,
           createdAt: 1,
           variants: 1,
+          isBestSeller: 1,
         }
       )
       .populate({
@@ -199,6 +201,7 @@ const getProductByIdWithOutAuth = async (req: any, res: Response) => {
         sku: 1,
         variants: 1,
         createdAt: 1,
+        isBestSeller: 1,
       })
       .populate({
         path: "supplier_id",
@@ -266,6 +269,7 @@ const getProductById = async (req: any, res: Response) => {
         brand: 1,
         sku: 1,
         createdAt: 1,
+        isBestSeller: 1,
       })
       .populate({
         path: "supplier_id",

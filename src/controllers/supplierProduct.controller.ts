@@ -4,6 +4,15 @@ import categoryModel from "../models/Category.model";
 import productModel from "../models/Product.model";
 import supplierModel from "../models/Supplier.model";
 import apiResponse from "../utils/ApiResponse";
+
+interface VariantDiscount {
+  type?: "percentage" | "flat";
+  value?: number;
+  active?: boolean;
+  startDate?: Date;
+  endDate?: Date;
+}
+
 interface VariantData {
   name: string;
   price: number;
@@ -16,6 +25,7 @@ interface VariantData {
   };
   sku: string;
   images?: string[];
+  discount?: VariantDiscount;
 }
 
 interface UpdateProductData {
@@ -25,8 +35,9 @@ interface UpdateProductData {
   category_id?: string;
   subcategory_id?: string;
   brand?: string;
-  images?: string[];
+  images?: { url: string; sequence: number }[];
   video?: string;
+  isBestSeller?: boolean;
 }
 
 const addProductBySupplier = async (req: any, res: Response) => {
@@ -45,14 +56,18 @@ const addProductBySupplier = async (req: any, res: Response) => {
       subcategory_id,
       brand,
       video,
+      isBestSeller,
     } = JSON.parse(req.body.data);
 
     const videoUrl = req.body.videoUrl || video;
-    let imageUrls: string[] = [];
+    let imageData: { url: string; sequence: number }[] = [];
     if (req.body.imageUrls && Array.isArray(req.body.imageUrls)) {
-      imageUrls = req.body.imageUrls;
+      imageData = req.body.imageUrls.map((url: string, index: number) => ({
+        url,
+        sequence: index,
+      }));
     } else if (req.body.imageUrl) {
-      imageUrls = [req.body.imageUrl];
+      imageData = [{ url: req.body.imageUrl, sequence: 0 }];
     }
 
     if (!mongoose.isValidObjectId(supplierId)) {
@@ -66,7 +81,7 @@ const addProductBySupplier = async (req: any, res: Response) => {
       !variants ||
       !category_id ||
       !brand ||
-      !imageUrls.length
+      !imageData.length
     ) {
       return apiResponse(res, 400, false, "Please fill all required fields");
     }
@@ -88,7 +103,28 @@ const addProductBySupplier = async (req: any, res: Response) => {
         return apiResponse(res, 400, false, "All variant fields are required");
       }
 
-      // Check SKU uniqueness across all products
+      if (variant.discount) {
+        if (!variant.discount.type || !variant.discount.value) {
+          return apiResponse(
+            res,
+            400,
+            false,
+            "Discount type and value are required"
+          );
+        }
+        if (
+          variant.discount.type === "percentage" &&
+          variant.discount.value > 100
+        ) {
+          return apiResponse(
+            res,
+            400,
+            false,
+            "Percentage discount cannot exceed 100"
+          );
+        }
+      }
+
       const skuExists = await productModel.findOne({
         "variants.sku": variant.sku,
       });
@@ -132,12 +168,22 @@ const addProductBySupplier = async (req: any, res: Response) => {
         ...v,
         price: mongoose.Types.Decimal128.fromString(v.price.toString()),
         images: v.images || [],
+        discount: v.discount
+          ? {
+              type: v.discount.type,
+              value: v.discount.value,
+              active: v.discount.active || false,
+              startDate: v.discount.startDate,
+              endDate: v.discount.endDate,
+            }
+          : undefined,
       })),
-      images: imageUrls,
+      images: imageData,
       reviews: [],
       rating: 0,
       video: videoUrl,
       brand,
+      isBestSeller: isBestSeller || false,
     });
 
     const savedProduct = await newProduct.save();
@@ -164,11 +210,14 @@ const updateProductBySupplier = async (req: any, res: Response) => {
     }
 
     let updateData: UpdateProductData = {};
-    let imageUrls: string[] = [];
+    let imageData: { url: string; sequence: number }[] = [];
     if (req.body.imageUrls && Array.isArray(req.body.imageUrls)) {
-      imageUrls = req.body.imageUrls;
+      imageData = req.body.imageUrls.map((url: string, index: number) => ({
+        url,
+        sequence: index,
+      }));
     } else if (req.body.imageUrl) {
-      imageUrls = [req.body.imageUrl];
+      imageData = [{ url: req.body.imageUrl, sequence: 0 }];
     }
 
     const videoUrl = req.body.videoUrl;
@@ -183,10 +232,10 @@ const updateProductBySupplier = async (req: any, res: Response) => {
         subcategory_id: parsedData.subcategory_id || product.subcategory_id,
         brand: parsedData.brand || product.brand,
         video: videoUrl || parsedData.video || product.video,
+        isBestSeller: parsedData.isBestSeller ?? product.isBestSeller,
       };
 
       if (parsedData.variants) {
-        // Validate variant SKUs
         for (const variant of parsedData.variants) {
           if (variant.sku) {
             const existingProduct = await productModel.findOne({
@@ -202,18 +251,58 @@ const updateProductBySupplier = async (req: any, res: Response) => {
               );
             }
           }
+          if (variant.discount) {
+            if (!variant.discount.type || !variant.discount.value) {
+              return apiResponse(
+                res,
+                400,
+                false,
+                "Discount type and value are required"
+              );
+            }
+            if (
+              variant.discount.type === "percentage" &&
+              variant.discount.value > 100
+            ) {
+              return apiResponse(
+                res,
+                400,
+                false,
+                "Percentage discount cannot exceed 100"
+              );
+            }
+          }
         }
 
         updateData.variants = parsedData.variants.map((v: VariantData) => ({
           ...v,
           price: mongoose.Types.Decimal128.fromString(v.price.toString()),
           images: v.images || [],
+          discount: v.discount
+            ? {
+                type: v.discount.type,
+                value: v.discount.value,
+                active: v.discount.active || false,
+                startDate: v.discount.startDate,
+                endDate: v.discount.endDate,
+              }
+            : undefined,
         }));
       }
 
       updateData.images = [
-        ...(Array.isArray(imageUrls) ? imageUrls : []),
-        ...(Array.isArray(parsedData?.oldImages) ? parsedData.oldImages : []),
+        ...(Array.isArray(imageData)
+          ? imageData.map((img, index) => ({
+              url: img,
+              sequence: index,
+            }))
+          : []),
+        ...(Array.isArray(parsedData?.oldImages)
+          ? parsedData.oldImages.map((img: string, index: number) => ({
+              url: img,
+              sequence: imageData.length + index,
+            }))
+          : []),
       ];
     }
 
@@ -244,7 +333,9 @@ const getAllSupplierProducts = async (req: any, res: Response) => {
       return apiResponse(res, 400, false, "Supplier ID is required.");
     }
 
-    const products = await productModel.find({ supplier_id: supplierId });
+    const products = await productModel
+      .find({ supplier_id: supplierId })
+      .sort({ isBestSeller: -1 }); // Sort best sellers first
 
     if (!products || products.length === 0) {
       return apiResponse(
@@ -296,7 +387,6 @@ const deleteProductBySupplier = async (req: any, res: Response) => {
       );
     }
 
-    // Delete the product
     await productModel.deleteOne({ _id: productId });
 
     return apiResponse(res, 200, true, "Product deleted successfully");
@@ -310,7 +400,6 @@ const getProductById = async (req: any, res: Response) => {
   const { productId } = req.params;
   const supplierId = req?.user?.id;
 
-  console.log("supplierId, productId", supplierId, productId);
   try {
     if (!supplierId || !productId) {
       return apiResponse(

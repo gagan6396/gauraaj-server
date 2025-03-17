@@ -66,3 +66,11 @@ temp/
 coverage/
 .nyc_output/
 node_modules
+
+
+# Docker
+Dockerfile.*
+*.dockerignore
+docker-compose.override.yml
+.docker
+*.log
