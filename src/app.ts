@@ -20,6 +20,7 @@ import googleRoute from "./routes/googleAuth.route";
 import orderRoute from "./routes/order.route";
 import paymentRoute from "./routes/payment.route";
 import productRoute from "./routes/product.route";
+import reviewRouter from "./routes/publicReview.route";
 import reelRoute from "./routes/reel.route";
 import reviewRoute from "./routes/review.route";
 import salesRoute from "./routes/sales.route";
@@ -67,5 +68,6 @@ app.use("/api/v1/contact", contactRoute);
 app.use("/api/v1/reels", reelRoute);
 app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/blogs", blogRoute);
+app.use("/api/v1/publicReview", reviewRouter);
 // Hello Commit
 export default app;
