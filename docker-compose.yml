@@ -1,64 +1,136 @@
+version: '3.8'
+
 services:
-  app:
+  # First app instance (renamed to gauraaj)
+  gauraaj:
     build:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "4001:4001"
+      - "4001:4001"  # gauraaj uses port 4001
     volumes:
       - .:/app
       - /app/node_modules
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
-      - KAFKA_BROKER=kafka:9092  # This matches Kafka's advertised listener
-      - DATABASE_URL=mongodb://admin:Rishabh1234%25@213.210.36.87:27017/gauraaj?authSource=admin
+      - KAFKA_BROKER=kafka1:9092  # Connects to kafka1
       - PORT=4001
-      - REDIS_HOST=redis
+      - REDIS_HOST=redis1
       - REDIS_PORT=6379
     depends_on:
-      - redis
-      - kafka
+      - redis1
+      - kafka1
     networks:
-      - app-network
+      - app1-network
 
-  redis:
+  # Second app instance (renamed to retrobeetle)
+  retrobeetle:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "4002:4002"  # retrobeetle uses port 4002
+    volumes:
+      - .:/app
+      - /app/node_modules
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - KAFKA_BROKER=kafka2:9092  # Connects to kafka2
+      - PORT=4002
+      - REDIS_HOST=redis2
+      - REDIS_PORT=6379
+    depends_on:
+      - redis2
+      - kafka2
+    networks:
+      - app2-network
+
+  # Redis for gauraaj
+  redis1:
     image: redis:alpine
     ports:
-      - "6379:6379"
+      - "6379:6379"  # Maps to 6379 on host for gauraaj
     volumes:
-      - redis-data:/data
+      - redis1-data:/data
     networks:
-      - app-network
+      - app1-network
 
-  zookeeper:
+  # Redis for retrobeetle
+  redis2:
+    image: redis:alpine
+    ports:
+      - "6380:6379"  # Maps to 6380 on host, internal port still 6379
+    volumes:
+      - redis2-data:/data
+    networks:
+      - app2-network
+
+  # Zookeeper for gauraaj
+  zookeeper1:
     image: confluentinc/cp-zookeeper:latest
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
     ports:
-      - "2181:2181"
+      - "2181:2181"  # Maps to 2181 on host for gauraaj
     networks:
-      - app-network
+      - app1-network
 
-  kafka:
+  # Zookeeper for retrobeetle
+  zookeeper2:
+    image: confluentinc/cp-zookeeper:latest
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2182:2181"  # Maps to 2182 on host, internal port still 2181
+    networks:
+      - app2-network
+
+  # Kafka for gauraaj
+  kafka1:
     image: confluentinc/cp-kafka:latest
     depends_on:
-      - zookeeper
+      - zookeeper1
     ports:
-      - "9092:9092"
+      - "9092:9092"  # Maps to 9092 on host for gauraaj
     environment:
       KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper1:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka1:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     networks:
-      - app-network
+      - app1-network
+
+  # Kafka for retrobeetle
+  kafka2:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - zookeeper2
+    ports:
+      - "9093:9092"  # Maps to 9093 on host, internal port still 9092
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper2:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka2:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - app2-network
 
 volumes:
-  redis-data:
+  redis1-data:
+  redis2-data:
 
 networks:
-  app-network:
+  app1-network:
+    driver: bridge
+  app2-network:
     driver: bridge
