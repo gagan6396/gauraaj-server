@@ -211,6 +211,8 @@ const updateProductBySupplier = async (req: any, res: Response) => {
 
     let updateData: UpdateProductData = {};
     let imageData: { url: string; sequence: number }[] = [];
+
+    // Handle new images
     if (req.body.imageUrls && Array.isArray(req.body.imageUrls)) {
       imageData = req.body.imageUrls.map((url: string, index: number) => ({
         url,
@@ -235,6 +237,7 @@ const updateProductBySupplier = async (req: any, res: Response) => {
         isBestSeller: parsedData.isBestSeller ?? product.isBestSeller,
       };
 
+      // Handle variants if provided
       if (parsedData.variants) {
         for (const variant of parsedData.variants) {
           if (variant.sku) {
@@ -290,20 +293,15 @@ const updateProductBySupplier = async (req: any, res: Response) => {
         }));
       }
 
+      // Combine new images with existing/old images
+      const oldImages = parsedData.oldImages || [];
       updateData.images = [
-        ...(Array.isArray(imageData)
-          ? imageData.map((img, index) => ({
-              url: img,
-              sequence: index,
-            }))
-          : []),
-        ...(Array.isArray(parsedData?.oldImages)
-          ? parsedData.oldImages.map((img: string, index: number) => ({
-              url: img,
-              sequence: imageData.length + index,
-            }))
-          : []),
-      ];
+        ...imageData, // Use imageData directly (already in correct format)
+        ...oldImages.map((img: string, index: number) => ({
+          url: img,
+          sequence: imageData.length + index, // Ensure unique sequence
+        })),
+      ].filter(Boolean); // Remove any undefined or null values
     }
 
     const updatedProduct = await productModel.findByIdAndUpdate(

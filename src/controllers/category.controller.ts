@@ -143,11 +143,12 @@ const updateCategory = async (req: Request, res: Response) => {
       }
     }
 
-    // if (req.body.imageUrls !== undefined && req.body.imageUrls !== null ) {
-    //   updates.images = req.body.imageUrls;
-    // }
-
-    if (req.body.imageUrls.length !== 0) {
+    // Check if req.body.imageUrls exists and is not null/undefined before accessing its length
+    if (
+      req.body.imageUrls &&
+      Array.isArray(req.body.imageUrls) &&
+      req.body.imageUrls.length > 0
+    ) {
       updates.images = req.body.imageUrls;
     }
 
@@ -571,7 +572,10 @@ export {
   fetchProductByCategory,
   fetchProductBySubCategory,
   fetchSubCategoryById,
-  getAllCategory, getAllSubcategories, getSubcategorySkuParameters, subCategoryFetching,
+  getAllCategory,
+  getAllSubcategories,
+  getSubcategorySkuParameters,
+  subCategoryFetching,
   updateCategory,
   updateSubCategory
 };
