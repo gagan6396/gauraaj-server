@@ -52,7 +52,6 @@ services:
   # Redis for gauraaj
   redis1:
     image: redis:alpine
-    command: redis-server --requirepass your_password_here --replica-read-only no
     ports:
       - "6379:6379"  # Maps to 6379 on host for gauraaj
     volumes:
@@ -63,7 +62,6 @@ services:
   # Redis for retrobeetle
   redis2:
     image: redis:alpine
-    command: redis-server --requirepass your_password_here --replica-read-only no
     ports:
       - "6380:6379"  # Maps to 6380 on host, internal port still 6379
     volumes:
