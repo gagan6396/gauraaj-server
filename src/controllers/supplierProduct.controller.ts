@@ -222,18 +222,19 @@ const updateProductBySupplier = async (req: any, res: Response) => {
       imageData = [{ url: req.body.imageUrl, sequence: 0 }];
     }
 
-    const videoUrl = req.body.videoUrl;
-
+    // Parse the data if it exists
     if (req.body.data) {
       const parsedData = JSON.parse(req.body.data);
 
+      // Construct updateData
       updateData = {
         name: parsedData.name || product.name,
         description: parsedData.description || product.description,
         category_id: parsedData.category_id || product.category_id,
         subcategory_id: parsedData.subcategory_id || product.subcategory_id,
         brand: parsedData.brand || product.brand,
-        video: videoUrl || parsedData.video || product.video,
+        // Use req.body.videoUrl first, then parsedData.video, then fallback to existing product.video
+        video: req.body.videoUrl || parsedData.video || product.video,
         isBestSeller: parsedData.isBestSeller ?? product.isBestSeller,
       };
 
@@ -302,6 +303,16 @@ const updateProductBySupplier = async (req: any, res: Response) => {
           sequence: imageData.length + index, // Ensure unique sequence
         })),
       ].filter(Boolean); // Remove any undefined or null values
+    } else {
+      // If no data is provided in req.body.data, at least handle video and images if they exist
+      updateData.video = req.body.videoUrl || product.video;
+      updateData.images = [
+        ...imageData,
+        ...(product.images || []).map((img: any, index: number) => ({
+          url: img.url,
+          sequence: imageData.length + index,
+        })),
+      ].filter(Boolean);
     }
 
     const updatedProduct = await productModel.findByIdAndUpdate(
