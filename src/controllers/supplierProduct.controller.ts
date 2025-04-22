@@ -225,6 +225,7 @@ const updateProductBySupplier = async (req: any, res: Response) => {
     // Parse the data if it exists
     if (req.body.data) {
       const parsedData = JSON.parse(req.body.data);
+      console.log(req.body.video, "videoUrl");
 
       // Construct updateData
       updateData = {
@@ -234,7 +235,11 @@ const updateProductBySupplier = async (req: any, res: Response) => {
         subcategory_id: parsedData.subcategory_id || product.subcategory_id,
         brand: parsedData.brand || product.brand,
         // Use req.body.videoUrl first, then parsedData.video, then fallback to existing product.video
-        video: req.body.videoUrl || parsedData.video || product.video,
+        video: req.body.video
+          ? req.body.video
+          : req.body.videoUrl
+          ? req.body.videoUrl
+          : "",
         isBestSeller: parsedData.isBestSeller ?? product.isBestSeller,
       };
 
@@ -305,7 +310,9 @@ const updateProductBySupplier = async (req: any, res: Response) => {
       ].filter(Boolean); // Remove any undefined or null values
     } else {
       // If no data is provided in req.body.data, at least handle video and images if they exist
-      updateData.video = req.body.videoUrl || product.video;
+      if (req.body.videoUrl) {
+        updateData.video = req.body.videoUrl;
+      }
       updateData.images = [
         ...imageData,
         ...(product.images || []).map((img: any, index: number) => ({
