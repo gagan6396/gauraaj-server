@@ -65,13 +65,52 @@ const createCategory = async (req: Request, res: Response) => {
   }
 };
 
+const updateCategorySequence = async (req: Request, res: Response) => {
+  try {
+    const { categoryId } = req.params;
+    const { sequence } = req.body;
+
+    // Validate categoryId
+    if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+      return apiResponse(res, 400, false, "Invalid category ID");
+    }
+
+    // Validate sequence
+    if (typeof sequence !== "number" || sequence < 0) {
+      return apiResponse(res, 400, false, "Invalid sequence value");
+    }
+
+    // Update the sequence field for the category
+    const updatedCategory = await categoryModel.findByIdAndUpdate(
+      categoryId,
+      { sequence },
+      { new: true } // Return the updated document
+    );
+
+    if (!updatedCategory) {
+      return apiResponse(res, 404, false, "Category not found");
+    }
+
+    return apiResponse(
+      res,
+      200,
+      true,
+      "Category sequence updated successfully",
+      updatedCategory
+    );
+  } catch (error) {
+    console.error("Error updating category sequence:", error);
+    return apiResponse(res, 500, false, "Internal server error");
+  }
+};
+
 // Get all category
 const getAllCategory = async (req: Request, res: Response) => {
   try {
     const category = await categoryModel
       .find({ parentCategoryId: null })
       .populate("parentCategoryId", "name")
-      .sort({ name: 1 });
+      .sort({ sequence: -1 });
 
     if (category.length === 0 || !category) {
       return apiResponse(res, 404, false, "Category is Empty");
@@ -577,6 +616,7 @@ export {
   getSubcategorySkuParameters,
   subCategoryFetching,
   updateCategory,
+  updateCategorySequence,
   updateSubCategory
 };
 

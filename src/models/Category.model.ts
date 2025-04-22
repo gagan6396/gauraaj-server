@@ -11,6 +11,7 @@ export interface ICategory extends Document {
   skuParameters?: string[];
   createdAt: Date;
   updatedAt: Date;
+  sequence: number; // Optional sequence field for ordering
 }
 
 // Updated Category Schema
@@ -48,8 +49,14 @@ const categorySchema = new mongoose.Schema<ICategory>(
       unique: true,
     },
     skuParameters: {
-      type: [String], 
-      default: [], 
+      type: [String],
+      default: [],
+    },
+    sequence: {
+      type: Number,
+      required: true,
+      min: [0, "Sequence cannot be negative"],
+      default: 0, // Default sequence value
     },
   },
   { timestamps: true }

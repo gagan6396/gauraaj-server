@@ -34,6 +34,7 @@ const getAllProductsWithOutAuth = async (req: any, res: Response) => {
           createdAt: 1,
           variants: 1,
           isBestSeller: 1,
+          sequence: 1,
         }
       )
       .populate({
@@ -52,7 +53,8 @@ const getAllProductsWithOutAuth = async (req: any, res: Response) => {
         path: "reviews",
         select: "rating comment user_id",
       })
-      .skip(skip);
+      .sort({ sequence: -1 });
+    // .skip(skip);
     // .limit(limit);
 
     // Count total number of products for pagination
@@ -106,6 +108,7 @@ const getAllProducts = async (req: any, res: Response) => {
           createdAt: 1,
           variants: 1,
           isBestSeller: 1,
+          sequence: 1,
         }
       )
       .populate({
@@ -124,7 +127,7 @@ const getAllProducts = async (req: any, res: Response) => {
         path: "reviews",
         select: "rating comment user_id",
       })
-      .skip(skip);
+      .sort({ sequence: -1 });
     // .limit(limit);
 
     // Fetch user's wishlist and cart
@@ -202,6 +205,7 @@ const getProductByIdWithOutAuth = async (req: any, res: Response) => {
         variants: 1,
         createdAt: 1,
         isBestSeller: 1,
+        sequence: 1,
       })
       .populate({
         path: "supplier_id",

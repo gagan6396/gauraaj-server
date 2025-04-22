@@ -5,6 +5,7 @@ import {
   getAllSupplierProducts,
   getProductById,
   updateProductBySupplier,
+  updateProductSequence,
 } from "../controllers/supplierProduct.controller";
 import authMiddleware from "../middlewares/authMiddleware";
 import handleImageUpload from "../middlewares/imageMiddleware";
@@ -38,6 +39,12 @@ supplierProductRoute.get(
   "/:supplierId",
   authMiddleware,
   getAllSupplierProducts
+);
+
+supplierProductRoute.post(
+  "/update-sequence/:productId",
+  authMiddleware,
+  updateProductSequence
 );
 
 export default supplierProductRoute;

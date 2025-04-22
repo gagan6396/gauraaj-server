@@ -13,6 +13,7 @@ import {
   getSubcategorySkuParameters,
   subCategoryFetching,
   updateCategory,
+  updateCategorySequence,
   updateSubCategory,
 } from "../controllers/category.controller";
 import handleImageUpload from "../middlewares/imageMiddleware";
@@ -33,6 +34,9 @@ categoryRoute.post(
   handleImageUpload,
   createSubCategory
 );
+
+categoryRoute.patch("/update-sequence/:categoryId", updateCategorySequence);
+
 categoryRoute.get(
   "/:categoryId/subcategory/:subCategoryId",
   fetchSubCategoryById

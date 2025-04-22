@@ -10,8 +10,6 @@ export interface Variant {
     height: number;
     length: number;
     width: number;
-
-    
   };
   sku: string;
   images?: string[];
@@ -37,6 +35,7 @@ export interface Product extends Document {
   rating: number;
   brand: string;
   isBestSeller: boolean; // Added best seller flag
+  sequence: number;
 }
 
 const variantSchema = new mongoose.Schema({
@@ -178,6 +177,12 @@ const productSchema: Schema<Product> = new mongoose.Schema(
     isBestSeller: {
       type: Boolean,
       default: false,
+    },
+    sequence: {
+      type: Number,
+      required: true,
+      min: [0, "Sequence cannot be negative"],
+      default: 0, // Default sequence value
     },
   },
   {

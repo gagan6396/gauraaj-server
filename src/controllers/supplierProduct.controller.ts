@@ -38,6 +38,7 @@ interface UpdateProductData {
   images?: { url: string; sequence: number }[];
   video?: string;
   isBestSeller?: boolean;
+  sequence?: number;
 }
 
 const addProductBySupplier = async (req: any, res: Response) => {
@@ -240,6 +241,7 @@ const updateProductBySupplier = async (req: any, res: Response) => {
           : req.body.videoUrl
           ? req.body.videoUrl
           : "",
+        sequence: req.body.sequence || product.sequence,
         isBestSeller: parsedData.isBestSeller ?? product.isBestSeller,
       };
 
@@ -351,7 +353,7 @@ const getAllSupplierProducts = async (req: any, res: Response) => {
 
     const products = await productModel
       .find({ supplier_id: supplierId })
-      .sort({ isBestSeller: -1 }); // Sort best sellers first
+      .sort({ sqeuence: 1 }); // Sort best sellers first
 
     if (!products || products.length === 0) {
       return apiResponse(
@@ -447,11 +449,57 @@ const getProductById = async (req: any, res: Response) => {
   }
 };
 
+const updateProductSequence = async (req: any, res: Response) => {
+  try {
+    const { productId } = req.params;
+    const supplierId = req?.user?.id;
+    const { sequence } = req.body;
+
+    if (!supplierId || !productId || sequence === undefined) {
+      return apiResponse(
+        res,
+        400,
+        false,
+        "Supplier ID, Product ID, and sequence are required."
+      );
+    }
+
+    const product = await productModel.findOne({
+      _id: productId,
+      supplier_id: supplierId,
+    });
+
+    if (!product) {
+      return apiResponse(
+        res,
+        404,
+        false,
+        "Product not found or doesn't belong to this supplier."
+      );
+    }
+
+    product.sequence = sequence;
+    await product.save();
+
+    return apiResponse(
+      res,
+      200,
+      true,
+      "Product sequence updated successfully",
+      product
+    );
+  } catch (error) {
+    console.error("Error updating product sequence:", error);
+    return apiResponse(res, 500, false, "Internal server error");
+  }
+};
+
 export {
   addProductBySupplier,
   deleteProductBySupplier,
   getAllSupplierProducts,
   getProductById,
-  updateProductBySupplier
+  updateProductBySupplier,
+  updateProductSequence
 };
 
