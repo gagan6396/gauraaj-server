@@ -1,4 +1,3 @@
-// models/Order.model.ts
 import mongoose, { Document, Schema } from "mongoose";
 
 export interface Order extends Document {
@@ -20,15 +19,23 @@ export interface Order extends Document {
     | "Returned";
   products: {
     productId: mongoose.Types.ObjectId;
-    variantId: string; // Variant SKU or identifier
+    variantId: string;
     quantity: number;
-    price: number; // Price of the variant at the time of order
-    name: string; // Product name + variant name for reference
-    skuParameters?: Record<string, string>;
+    price: number;
+    name: string;
+    skuParameters?: Record<string, any>;
   }[];
-  shipRocketOrderId?: number;
+  shipRocketOrderId?: string;
   shippingAddressId: mongoose.Types.ObjectId;
   payment_id: mongoose.Types.ObjectId;
+  paymentMethod: 0 | 1; // 0 for Razorpay, 1 for COD
+  userDetails: {
+    name: string;
+    phone: string;
+    email: string;
+  };
+  estimatedDeliveryDays?: number;
+  courierService?: string;
 }
 
 const OrderSchema: Schema<Order> = new Schema(
@@ -72,7 +79,7 @@ const OrderSchema: Schema<Order> = new Schema(
           required: true,
         },
         variantId: {
-          type: String, // Use SKU or another unique identifier for the variant
+          type: String,
           required: true,
         },
         quantity: {
@@ -90,12 +97,12 @@ const OrderSchema: Schema<Order> = new Schema(
         },
         skuParameters: {
           type: Map,
-          of: String,
+          of: Schema.Types.Mixed,
         },
       },
     ],
     shipRocketOrderId: {
-      type: Number,
+      type: String,
       required: false,
     },
     shippingAddressId: {
@@ -106,6 +113,33 @@ const OrderSchema: Schema<Order> = new Schema(
     payment_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Payment",
+    },
+    paymentMethod: {
+      type: Number,
+      enum: [0, 1],
+      required: true,
+    },
+    userDetails: {
+      name: {
+        type: String,
+        required: true,
+      },
+      phone: {
+        type: String,
+        required: true,
+      },
+      email: {
+        type: String,
+        required: true,
+      },
+    },
+    estimatedDeliveryDays: {
+      type: Number,
+      required: false,
+    },
+    courierService: {
+      type: String,
+      required: false,
     },
   },
   {

@@ -1,6 +1,9 @@
+import axios, { AxiosError } from "axios";
 import { Request, Response } from "express";
 import mongoose from "mongoose";
 import Razorpay from "razorpay";
+import { sendMessageToKafka } from "../config/kafkaConfig";
+import shipRocketConfig from "../config/shipRocketConfig";
 import CartModel from "../models/Cart.model";
 import orderModel from "../models/Order.model";
 import PaymentModel from "../models/Payment.model";
@@ -14,45 +17,379 @@ import {
   shipRocketTrackOrder,
 } from "../services/shipRocket.service";
 import apiResponse from "../utils/ApiResponse";
+import { sendEmail } from "../utils/EmailHelper";
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID as string,
   key_secret: process.env.RAZORPAY_KEY_SECRET as string,
 });
 
+// 1. Product Added to Cart
+const addProductToCart = async (req: any, res: Response) => {
+  try {
+    const userId = req?.user?.id;
+    const { productId, variantId } = req?.params;
+    const { quantity, postalCode } = req?.body; // Added postalCode for delivery check
+
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return apiResponse(res, 400, false, "Invalid product ID.");
+    }
+    if (!mongoose.Types.ObjectId.isValid(variantId)) {
+      return apiResponse(res, 400, false, "Invalid variant ID.");
+    }
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return apiResponse(res, 400, false, "Invalid user ID.");
+    }
+    if (!postalCode) {
+      return apiResponse(res, 400, false, "Postal code is required.");
+    }
+
+    const parsedQuantity = Number(quantity);
+    if (isNaN(parsedQuantity) || parsedQuantity <= 0) {
+      return apiResponse(res, 400, false, "Quantity must be greater than 0.");
+    }
+
+    const product = await productModel.findById(productId);
+    if (!product) {
+      return apiResponse(res, 404, false, "Product not found.");
+    }
+
+    const variant = product.variants.find((v: any) => v._id.equals(variantId));
+    if (!variant) {
+      return apiResponse(res, 404, false, "Variant not found.");
+    }
+    if (variant.stock < parsedQuantity) {
+      return apiResponse(
+        res,
+        400,
+        false,
+        `Insufficient stock: ${variant.stock}`
+      );
+    }
+
+    // Check delivery availability
+    const deliveryAvailable = await checkDeliveryAvailability(
+      postalCode,
+      product
+    );
+    if (!deliveryAvailable.isAvailable) {
+      return apiResponse(res, 400, false, deliveryAvailable.message);
+    }
+
+    let cart = await CartModel.findOne({ userId });
+    if (!cart) {
+      cart = await CartModel.create({
+        userId: new mongoose.Types.ObjectId(userId),
+        products: [],
+      });
+    }
+
+    const productInCart = cart.products.find(
+      (item: any) =>
+        item.productId.toString() === productId &&
+        item.variantId.toString() === variantId
+    );
+
+    if (productInCart) {
+      productInCart.quantity += parsedQuantity;
+      if (productInCart.quantity > variant.stock) {
+        return apiResponse(
+          res,
+          400,
+          false,
+          `Insufficient stock: ${variant.stock}`
+        );
+      }
+    } else {
+      cart.products.push({
+        productId: new mongoose.Types.ObjectId(productId),
+        variantId: new mongoose.Types.ObjectId(variantId),
+        quantity: parsedQuantity,
+      });
+    }
+
+    await cart.save();
+    const updatedCart = await CartModel.findById(cart._id).populate({
+      path: "products.productId",
+      select: "name images variants rating brand",
+    });
+
+    return apiResponse(res, 200, true, "Product added to cart.", updatedCart);
+  } catch (error) {
+    console.error("Error adding product to cart:", error);
+    return apiResponse(res, 500, false, "Internal Server Error");
+  }
+};
+
+// Helper function to check delivery availability
+const checkDeliveryAvailability = async (postalCode: string, product: any) => {
+  try {
+    const token = await getShipRocketToken();
+    const response = await axios.get(
+      `${shipRocketConfig.baseUrl}/v1/external/courier/serviceability/`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        params: {
+          pickup_postcode: product.supplier_id.postalCode || "110001",
+          delivery_postcode: postalCode,
+          weight: product.variants[0].weight,
+          length: product.variants[0].dimensions.length,
+          breadth: product.variants[0].dimensions.width,
+          height: product.variants[0].dimensions.height,
+          cod: false,
+          declared_value: parseFloat(product.variants[0].price.toString()),
+        },
+      }
+    );
+
+    const availableCouriers = response.data.data.available_courier_companies;
+    if (!availableCouriers.length) {
+      return {
+        isAvailable: false,
+        message: "Delivery not available to this location.",
+      };
+    }
+
+    return {
+      isAvailable: true,
+      message: "Delivery available.",
+      couriers: availableCouriers,
+    };
+  } catch (error) {
+    console.error("Error checking delivery availability:", error);
+    return {
+      isAvailable: false,
+      message: "Unable to check delivery availability.",
+    };
+  }
+};
+
+// 2. Calculating Shipping Charges
+const calculateShippingCharges = async (req: any, res: Response) => {
+  try {
+    const userId = req?.user?.id;
+    const { postalCode, products, isCOD } = req.body;
+
+    // Validate inputs
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return apiResponse(res, 400, false, "Invalid user ID.");
+    }
+    if (!postalCode || !products?.length) {
+      return apiResponse(
+        res,
+        400,
+        false,
+        "Postal code and products are required."
+      );
+    }
+
+    let totalWeight = 0;
+    let totalDimensions = { length: 0, width: 0, height: 0 };
+    let subTotal = 0;
+
+    // Calculate total weight, dimensions, and subtotal
+    for (const item of products) {
+      const product = await productModel.findById(item.productId);
+      if (!product) {
+        return apiResponse(
+          res,
+          404,
+          false,
+          `Product not found: ${item.productId}`
+        );
+      }
+      const variant = product.variants.find((v: any) =>
+        v._id.equals(item.variantId)
+      );
+      if (!variant) {
+        return apiResponse(
+          res,
+          404,
+          false,
+          `Variant not found: ${item.variantId}`
+        );
+      }
+
+      totalWeight += variant.weight * item.quantity;
+      totalDimensions.length += variant.dimensions.length * item.quantity;
+      totalDimensions.width += variant.dimensions.width * item.quantity;
+      totalDimensions.height += variant.dimensions.height * item.quantity;
+      subTotal += parseFloat(variant.price.toString()) * item.quantity;
+    }
+
+    // Validate calculated values
+    if (totalWeight <= 0) {
+      return apiResponse(
+        res,
+        400,
+        false,
+        "Total weight must be greater than zero."
+      );
+    }
+    if (
+      totalDimensions.length <= 0 ||
+      totalDimensions.width <= 0 ||
+      totalDimensions.height <= 0
+    ) {
+      return apiResponse(
+        res,
+        400,
+        false,
+        "Dimensions must be greater than zero."
+      );
+    }
+
+    // Get Shiprocket token
+    const token = await getShipRocketToken();
+
+    // Configurable pickup postcode (from environment or default)
+    const pickupPostcode = process.env.SHIPROCKET_PICKUP_POSTCODE || "110001";
+
+    // Make API request to Shiprocket
+    const response = await axios.get(
+      `${shipRocketConfig.baseUrl}/v1/external/courier/serviceability/`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        params: {
+          pickup_postcode: pickupPostcode,
+          delivery_postcode: postalCode,
+          weight: totalWeight,
+          length: totalDimensions.length,
+          breadth: totalDimensions.width,
+          height: totalDimensions.height,
+          cod: isCOD,
+          declared_value: subTotal, // Required field
+        },
+      }
+    );
+
+    console.log("ShipRocket response:", response.data);
+
+    const couriers = response.data.data.available_courier_companies;
+    if (!couriers.length) {
+      return apiResponse(
+        res,
+        400,
+        false,
+        "No couriers available for this location."
+      );
+    }
+
+    // Map courier options
+    const shippingOptions = couriers.map((courier: any) => ({
+      courierName: courier.courier_name,
+      rate: courier.rate,
+      estimatedDeliveryDays: courier.estimated_delivery_days,
+      type: courier.is_express ? "Express" : "Standard",
+    }));
+
+    return apiResponse(res, 200, true, "Shipping charges calculated.", {
+      shippingOptions,
+      subTotal,
+      totalWeight,
+    });
+  } catch (error: any) {
+    // Enhanced error handling for Axios errors
+    if (error instanceof AxiosError) {
+      const errorMessage =
+        error.response?.data?.message || "Failed to fetch shipping charges";
+      console.error("Shiprocket API error:", {
+        status: error.response?.status,
+        message: errorMessage,
+        errors: error.response?.data?.errors,
+      });
+      return apiResponse(
+        res,
+        error.response?.status || 500,
+        false,
+        errorMessage
+      );
+    }
+
+    console.error("Error calculating shipping charges:", error);
+    return apiResponse(res, 500, false, "Error calculating shipping charges");
+  }
+};
+
+// 3. Create Order
 const createOrder = async (req: any, res: Response) => {
   try {
     const userId = req?.user?.id;
-    const { products, shippingAddress, paymentMethod, userDetails } = req.body;
+    const {
+      products,
+      shippingAddress,
+      paymentMethod,
+      userDetails,
+      shippingMethod,
+    } = req.body;
+
+    console.log(
+      "Creating order with products:",
+      products,
+      "Shipping address:",
+      shippingAddress,
+      "Payment method:",
+      paymentMethod,
+      "User details:",
+      userDetails,
+      "Shipping method:",
+      shippingMethod,
+      "User ID:",
+      userId
+    );
 
     if (
       !userId ||
       !products?.length ||
       !shippingAddress ||
-      !paymentMethod ||
-      !userDetails
+      !userDetails ||
+      !shippingMethod ||
+      !Number.isInteger(paymentMethod) ||
+      ![0, 1].includes(paymentMethod)
     ) {
-      throw new Error("Missing required fields");
+      throw new Error("Missing or invalid required fields");
     }
 
     const { totalAmount, updatedProducts } = await processProducts(products);
+    const isCOD = paymentMethod === 1 ? 1 : 0;
+    const shippingCharges = await calculateShippingChargesForOrder(
+      products,
+      shippingAddress.postalCode,
+      shippingMethod,
+      isCOD
+    );
 
     const newOrder = new orderModel({
       user_id: userId,
       orderDate: new Date(),
-      totalAmount,
+      totalAmount: totalAmount + shippingCharges.rate,
       orderStatus: "Pending",
       shippingStatus: "Pending",
       products: updatedProducts,
       shippingAddressId: new mongoose.Types.ObjectId(), // Temporary ID
+      paymentMethod,
+      userDetails: {
+        name: userDetails.name,
+        phone: userDetails.phone,
+        email: userDetails.email,
+      },
+      estimatedDeliveryDays: shippingCharges.estimatedDeliveryDays,
+      courierService: shippingCharges.courierName, // Store courier name
     });
 
     const savedOrder = await newOrder.save();
 
     let paymentData;
-    if (paymentMethod === "Razorpay") {
+    if (paymentMethod === 0) {
+      // Razorpay
       const razorpayOrder = await razorpay.orders.create({
-        amount: totalAmount * 100,
+        amount: (totalAmount + shippingCharges.rate) * 100,
         currency: "INR",
         receipt: `order_${savedOrder._id}`,
       });
@@ -60,18 +397,19 @@ const createOrder = async (req: any, res: Response) => {
       paymentData = new PaymentModel({
         userId,
         orderId: savedOrder._id,
-        paymentMethod,
+        paymentMethod: "Razorpay",
         transactionId: razorpayOrder.id,
-        amount: totalAmount,
+        amount: totalAmount + shippingCharges.rate,
         status: "Pending",
       });
-    } else if (paymentMethod === "COD") {
+    } else if (paymentMethod === 1) {
+      // COD
       paymentData = new PaymentModel({
         userId,
         orderId: savedOrder._id,
-        paymentMethod,
+        paymentMethod: "COD",
         transactionId: `COD_${savedOrder._id}`,
-        amount: totalAmount,
+        amount: totalAmount + shippingCharges.rate,
         status: "Pending",
       });
     } else {
@@ -89,13 +427,12 @@ const createOrder = async (req: any, res: Response) => {
           first_name: userDetails.name.split(" ")[0],
           last_name: userDetails.name.split(" ").slice(1).join(" ") || "",
           phone: userDetails.phone,
-          shippingAddress,
+          shoppingAddress: shippingAddress,
         },
         $push: { orderList: savedOrder._id },
       }
     );
 
-    // Update the cart: Remove items that were ordered
     await CartModel.updateOne(
       { user_id: userId },
       {
@@ -110,12 +447,18 @@ const createOrder = async (req: any, res: Response) => {
 
     return apiResponse(res, 200, true, "Order created successfully", {
       orderId: savedOrder._id,
-      totalAmount,
-      razorpayOrderId:
-        paymentMethod === "Razorpay" ? paymentData.transactionId : null,
+      totalAmount: totalAmount + shippingCharges.rate,
+      shippingCharges: shippingCharges.rate,
+      estimatedDeliveryDays: shippingCharges.estimatedDeliveryDays,
+      courierName: shippingCharges.courierName,
+      razorpayOrderId: paymentMethod === 0 ? paymentData.transactionId : null,
     });
   } catch (error: any) {
-    console.error("Order creation failed:", error);
+    console.error("Order creation failed:", {
+      message: error.message,
+      stack: error.stack,
+      input: req.body,
+    });
     if (error.orderId) {
       await orderModel.deleteOne({ _id: error.orderId });
       await PaymentModel.deleteOne({ orderId: error.orderId });
@@ -149,7 +492,6 @@ const processProducts = async (products: any[]) => {
       throw new Error(`Product not found: ${productId}`);
     }
 
-    console.log(product.variants);
     const variant = product.variants.find((v: any) => v._id.equals(variantId));
     if (!variant) {
       throw new Error(
@@ -171,7 +513,7 @@ const processProducts = async (products: any[]) => {
       quantity,
       price,
       name: `${product.name} - ${variant.name}`,
-      skuParameters: { weight: variant.weight.toString() }, // Example
+      skuParameters: { weight: variant.weight.toString() },
     });
 
     variant.stock -= quantity;
@@ -181,6 +523,696 @@ const processProducts = async (products: any[]) => {
   return { totalAmount, updatedProducts };
 };
 
+const calculateShippingChargesForOrder = async (
+  products: any[],
+  postalCode: string,
+  shippingMethod: string,
+  isCOD: number
+) => {
+  try {
+    let totalWeight = 0;
+    let totalDimensions = { length: 0, width: 0, height: 0 };
+    let subTotal = 0;
+
+    // Calculate total weight, dimensions, and subtotal
+    for (const item of products) {
+      const product = await productModel.findById(item.productId);
+      if (!product) {
+        throw new Error(`Product not found: ${item.productId}`);
+      }
+      const variant = product.variants.find((v: any) =>
+        v._id.equals(item.variantId)
+      );
+      if (!variant) {
+        throw new Error(`Variant not found: ${item.variantId}`);
+      }
+      totalWeight += variant.weight * item.quantity;
+      totalDimensions.length += variant.dimensions.length * item.quantity;
+      totalDimensions.width += variant.dimensions.width * item.quantity;
+      totalDimensions.height += variant.dimensions.height * item.quantity;
+      subTotal += parseFloat(variant.price.toString()) * item.quantity;
+    }
+
+    // Validate calculated values
+    if (totalWeight <= 0) {
+      throw new Error("Total weight must be greater than zero.");
+    }
+    if (
+      totalDimensions.length <= 0 ||
+      totalDimensions.width <= 0 ||
+      totalDimensions.height <= 0
+    ) {
+      throw new Error("Dimensions must be greater than zero.");
+    }
+
+    // Get Shiprocket token
+    const token = await getShipRocketToken();
+
+    // Configurable pickup postcode
+    const pickupPostcode = process.env.SHIPROCKET_PICKUP_POSTCODE || "110001";
+
+    // Make API request to Shiprocket
+    const response = await axios.get(
+      `${shipRocketConfig.baseUrl}/v1/external/courier/serviceability/`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        params: {
+          pickup_postcode: pickupPostcode,
+          delivery_postcode: postalCode,
+          weight: totalWeight,
+          length: totalDimensions.length,
+          breadth: totalDimensions.width,
+          height: totalDimensions.height,
+          cod: isCOD,
+          declared_value: subTotal,
+        },
+      }
+    );
+
+    const couriers = response.data.data.available_courier_companies;
+    if (!couriers || couriers.length === 0) {
+      throw new Error("No couriers available for this location.");
+    }
+
+    // Filter couriers based on the shippingMethod matching the 'type' field
+    const selectedCourier = couriers.find(
+      (c: any) =>
+        c.courier_name &&
+        (shippingMethod === "Standard" ? !c.is_express : c.is_express)
+    );
+
+    if (!selectedCourier) {
+      console.error("Available couriers:", couriers);
+      throw new Error(`No ${shippingMethod} couriers available.`);
+    }
+
+    return {
+      rate: selectedCourier.rate,
+      estimatedDeliveryDays: parseInt(
+        selectedCourier.estimated_delivery_days,
+        10
+      ),
+      courierName: selectedCourier.courier_name,
+    };
+  } catch (error: any) {
+    if (error instanceof AxiosError) {
+      const errorMessage =
+        error.response?.data?.message || "Failed to fetch shipping charges";
+      console.error("Shiprocket API error:", {
+        status: error.response?.status,
+        message: errorMessage,
+        errors: error.response?.data?.errors,
+        requestParams: {
+          postalCode,
+          // totalWeight,
+          // totalDimensions,
+          isCOD,
+          // subTotal,
+        },
+      });
+      throw new Error(errorMessage);
+    }
+    console.error("Error calculating shipping charges for order:", error);
+    throw new Error(error.message || "Failed to calculate shipping charges");
+  }
+};
+
+// 4. Ship Order
+const shipOrder = async (req: any, res: Response) => {
+  try {
+    const { orderId } = req.params;
+    const userId = req?.user?.id;
+
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return apiResponse(res, 400, false, "Invalid order ID.");
+    }
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return apiResponse(res, 400, false, "Invalid user ID.");
+    }
+
+    const order = await orderModel
+      .findById(orderId)
+      .populate("user_id payment_id");
+    if (!order) {
+      return apiResponse(res, 404, false, "Order not found.");
+    }
+    if (order.user_id._id.toString() !== userId) {
+      return apiResponse(res, 403, false, "Unauthorized access to order.");
+    }
+    if (order.orderStatus !== "Confirmed") {
+      return apiResponse(res, 400, false, "Order must be confirmed to ship.");
+    }
+
+    const shipping = await ShippingModel.findOne({ orderId });
+    if (!shipping) {
+      return apiResponse(res, 400, false, "Shipping record not found.");
+    }
+
+    // Generate shipping label (hypothetical implementation)
+    const shippingLabel = await generateShippingLabel(order, shipping);
+    const trackingNumber = `TRK${order._id}${Date.now()}`; // Simplified tracking number
+
+    // Assign courier partner
+    const courierDetails = await assignCourier(order.shipRocketOrderId);
+    if (!courierDetails) {
+      return apiResponse(res, 400, false, "Failed to assign courier.");
+    }
+
+    // Update shipping record
+    shipping.trackingNumber = trackingNumber;
+    shipping.courierService = courierDetails.courierName;
+    shipping.shippingStatus = "Shipped";
+    shipping.shippedAt = new Date();
+    await shipping.save();
+
+    // Update order status
+    order.orderStatus = "Shipped";
+    order.shippingStatus = "Shipped";
+    await order.save();
+
+    // Send shipping confirmation
+    await sendShippingConfirmation(order, shipping, trackingNumber);
+
+    await sendMessageToKafka("order.shipped", {
+      event: "order_shipped",
+      orderId,
+      trackingNumber,
+      courier: courierDetails.courierName,
+    });
+
+    return apiResponse(res, 200, true, "Order shipped successfully.", {
+      orderId,
+      trackingNumber,
+      courier: courierDetails.courierName,
+    });
+  } catch (error) {
+    console.error("Error shipping order:", error);
+    return apiResponse(res, 500, false, "Error shipping order.");
+  }
+};
+
+const generateShippingLabel = async (order: any, shipping: any) => {
+  // Hypothetical implementation
+  const token = await getShipRocketToken();
+  const response = await axios.post(
+    `${shipRocketConfig.baseUrl}/v1/external/courier/generate/label`,
+    { shipment_id: order.shipRocketOrderId },
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  return response.data.label_url;
+};
+
+const assignCourier = async (shipRocketOrderId: number) => {
+  const token = await getShipRocketToken();
+  const response = await axios.post(
+    `${shipRocketConfig.baseUrl}/v1/external/courier/assign/awb`,
+    { shipment_id: shipRocketOrderId },
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  return response.data.courier;
+};
+
+const sendShippingConfirmation = async (
+  order: any,
+  shipping: any,
+  trackingNumber: string
+) => {
+  const user = order.user_id;
+  const emailContent = `
+    Dear ${user.first_name},
+    Your order ${order._id} has been shipped via ${shipping.courierService}.
+    Track your order: ${trackingNumber}
+    Estimated Delivery: ${shipping.estimatedDeliveryDate}
+  `;
+  await sendEmail(user.email, "Order Shipped", emailContent);
+};
+
+// 5. Track Order
+const trackOrder = async (req: Request, res: Response) => {
+  try {
+    const { orderId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return apiResponse(res, 400, false, "Invalid order ID.");
+    }
+
+    const order = await orderModel.findById(orderId);
+    if (!order) {
+      return apiResponse(res, 404, false, "Order not found.");
+    }
+
+    const shipRocketOrderId = order.shipRocketOrderId;
+    if (!shipRocketOrderId) {
+      return apiResponse(res, 404, false, "ShipRocket Order ID not found.");
+    }
+
+    const orderDetails = await getOrderDetailsFromShipRocket(shipRocketOrderId);
+    if (!orderDetails) {
+      return apiResponse(
+        res,
+        404,
+        false,
+        "Unable to fetch ShipRocket order details."
+      );
+    }
+
+    const shipmentId = orderDetails?.data?.shipments?.id;
+    if (!shipmentId) {
+      return apiResponse(res, 404, false, "Shipment ID not found.");
+    }
+
+    const trackingDetails = await shipRocketTrackOrder(shipmentId);
+    if (trackingDetails) {
+      return apiResponse(
+        res,
+        200,
+        true,
+        "Tracking details retrieved.",
+        trackingDetails
+      );
+    }
+
+    return apiResponse(res, 404, false, "Tracking details not found.");
+  } catch (error) {
+    console.error("Error tracking order:", error);
+    return apiResponse(res, 500, false, "Error tracking order.");
+  }
+};
+
+// 6. Return Order
+const returnOrder = async (req: any, res: Response) => {
+  try {
+    const { orderId } = req.params;
+    const userId = req?.user?.id;
+    const { reason, products } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return apiResponse(res, 400, false, "Invalid order ID.");
+    }
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return apiResponse(res, 400, false, "Invalid user ID.");
+    }
+    if (!reason || !products?.length) {
+      return apiResponse(res, 400, false, "Reason and products required.");
+    }
+
+    const order = await orderModel.findById(orderId);
+    if (!order) {
+      return apiResponse(res, 404, false, "Order not found.");
+    }
+    if (order.user_id.toString() !== userId) {
+      return apiResponse(res, 403, false, "Unauthorized access.");
+    }
+    if (order.orderStatus !== "Delivered") {
+      return apiResponse(
+        res,
+        403,
+        false,
+        "Only delivered orders can be returned."
+      );
+    }
+
+    const invalidProducts: string[] = [];
+    for (const item of products) {
+      const orderProduct = order.products.find(
+        (p: any) =>
+          p.productId.toString() === item.productId &&
+          p.quantity >= item.quantity
+      );
+      if (!orderProduct) {
+        invalidProducts.push(item.productId);
+      }
+    }
+    if (invalidProducts.length) {
+      return apiResponse(
+        res,
+        400,
+        false,
+        `Invalid products: ${invalidProducts.join(", ")}`
+      );
+    }
+
+    for (const { productId, quantity } of products) {
+      const productDetails = await productModel.findById(productId);
+      if (productDetails) {
+        productDetails.stock += quantity;
+        await productDetails.save();
+      }
+    }
+
+    order.orderStatus = "Return Requested";
+    order.shippingStatus = "Returned";
+    order.products = order.products.map((p: any) => {
+      const matchingProduct = products.find(
+        (prod: any) => prod.productId === p.productId.toString()
+      );
+      if (matchingProduct) {
+        return { ...p, returnRequested: true, reason };
+      }
+      return p;
+    });
+
+    const updatedOrder = await order.save();
+    const shipping = await ShippingModel.findOne({ orderId });
+    if (shipping) {
+      shipping.shippingStatus = "Returned";
+      await shipping.save();
+    }
+
+    const shipRocketOrderId = order.shipRocketOrderId;
+    const details = await getOrderDetailsFromShipRocket(shipRocketOrderId);
+    if (!details) {
+      return apiResponse(res, 400, false, "Error fetching ShipRocket details.");
+    }
+
+    const shipRocketPayload = {
+      order_id: order._id,
+      order_date: order.orderDate,
+      channel_id: details.data.channel_id,
+      pickup_customer_name: details.data.customer_name,
+      pickup_email: details.data.customer_email,
+      pickup_phone: details.data.customer_phone,
+      pickup_address: details.data.customer_address,
+      pickup_city: details.data.customer_city,
+      pickup_state: details.data.customer_state,
+      pickup_pincode: details.data.customer_pincode,
+      pickup_country: details.data.customer_country,
+      shipping_customer_name: details.data.customer_name,
+      shipping_email: details.data.customer_email,
+      shipping_phone: details.data.customer_phone,
+      shipping_address: details.data.customer_address,
+      shipping_city: details.data.customer_city,
+      shipping_state: details.data.customer_state,
+      shipping_pincode: details.data.customer_pincode,
+      shipping_country: details.data.customer_country,
+      order_items: products.map((p: any) => ({
+        name: p.productId,
+        sku: p.productId,
+        units: p.quantity,
+        selling_price: "1200",
+      })),
+      payment_method: details.data.payment_method,
+      sub_total: details.data.total,
+      length: details.data.shipments.length,
+      breadth: details.data.shipments.breadth,
+      height: details.data.shipments.height,
+      weight: details.data.shipments.weight,
+    };
+
+    const shipRocketResponse = await shipRocketReturnOrder(shipRocketPayload);
+    if (!shipRocketResponse) {
+      return apiResponse(res, 400, false, "ShipRocket API response error.");
+    }
+
+    // Schedule return pickup
+    const returnLabel = await generateReturnLabel(order);
+    await scheduleReturnPickup(order, shipping);
+
+    return apiResponse(res, 200, true, "Return requested successfully.", {
+      updatedOrder,
+      shipRocketResponse,
+      returnLabel,
+    });
+  } catch (error) {
+    console.error("Error processing return:", error);
+    return apiResponse(res, 500, false, "Error processing return.");
+  }
+};
+
+const generateReturnLabel = async (order: any) => {
+  const token = await getShipRocketToken();
+  const response = await axios.post(
+    `${shipRocketConfig.baseUrl}/v1/external/courier/generate/return-label`,
+    { order_id: order.shipRocketOrderId },
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  return response.data.label_url;
+};
+
+const scheduleReturnPickup = async (order: any, shipping: any) => {
+  const token = await getShipRocketToken();
+  await axios.post(
+    `${shipRocketConfig.baseUrl}/v1/external/courier/schedule-pickup`,
+    {
+      order_id: order.shipRocketOrderId,
+      pickup_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    },
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+};
+
+// 7. Cancel Order
+const cancelOrder = async (req: any, res: Response) => {
+  try {
+    const { orderId } = req.params;
+    const userId = req?.user?.id;
+
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return apiResponse(res, 400, false, "Invalid order ID.");
+    }
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return apiResponse(res, 400, false, "Invalid user ID.");
+    }
+
+    const order = await orderModel.findById(orderId).populate("payment_id");
+    if (!order) {
+      return apiResponse(res, 404, false, "Order not found.");
+    }
+    if (order.user_id.toString() !== userId) {
+      return apiResponse(res, 403, false, "Unauthorized access.");
+    }
+    if (order.orderStatus === "Cancelled") {
+      return apiResponse(res, 400, false, "Order already cancelled.");
+    }
+
+    if (order.orderStatus === "Shipped" || order.orderStatus === "Delivered") {
+      return apiResponse(
+        res,
+        400,
+        false,
+        "Order shipped. Please request a return."
+      );
+    }
+
+    order.orderStatus = "Cancelled";
+    order.shippingStatus = "Cancelled";
+    await order.save();
+
+    const shipping = await ShippingModel.findOne({ orderId });
+    if (shipping) {
+      shipping.shippingStatus = "Cancelled";
+      await shipping.save();
+    }
+
+    if (order.payment_id && order.payment_id.status === "Completed") {
+      await initiateRefund(order);
+    }
+
+    if (order.shipRocketOrderId) {
+      await cancelShipRocketOrder(orderId, order.shipRocketOrderId);
+    }
+
+    // Restore stock
+    for (const product of order.products) {
+      const productDetails = await productModel.findById(product.productId);
+      if (productDetails) {
+        const variant = productDetails.variants.find((v: any) =>
+          v._id.equals(product.variantId)
+        );
+        if (variant) {
+          variant.stock += product.quantity;
+          await productDetails.save();
+        }
+      }
+    }
+
+    return apiResponse(res, 200, true, "Order cancelled successfully.");
+  } catch (error) {
+    console.error("Error cancelling order:", error);
+    return apiResponse(res, 500, false, "Error cancelling order.");
+  }
+};
+
+const initiateRefund = async (order: any) => {
+  if (order.payment_id.paymentMethod === "Razorpay") {
+    const refund = await razorpay.payments.refund(
+      order.payment_id.transactionId,
+      {
+        amount: order.totalAmount * 100,
+      }
+    );
+    await PaymentModel.findByIdAndUpdate(order.payment_id._id, {
+      status: "Refunded",
+      refundDetails: {
+        refundId: refund.id,
+        amount: order.totalAmount,
+        refundedAt: new Date(),
+      },
+    });
+  } else if (order.payment_id.paymentMethod === "COD") {
+    // Handle COD refund (e.g., via bank transfer or wallet)
+    await PaymentModel.findByIdAndUpdate(order.payment_id._id, {
+      status: "Refunded",
+      refundDetails: { amount: order.totalAmount, refundedAt: new Date() },
+    });
+  }
+};
+
+// 8. Post-Order Actions
+const postOrderActions = async (req: any, res: Response) => {
+  try {
+    const { orderId } = req.params;
+    const userId = req?.user?.id;
+
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return apiResponse(res, 400, false, "Invalid order ID.");
+    }
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return apiResponse(res, 400, false, "Invalid user ID.");
+    }
+
+    const order = await orderModel.findById(orderId).populate("user_id");
+    if (!order) {
+      return apiResponse(res, 404, false, "Order not found.");
+    }
+    if (order.user_id._id.toString() !== userId) {
+      return apiResponse(res, 403, false, "Unauthorized access.");
+    }
+    if (order.orderStatus !== "Delivered") {
+      return apiResponse(res, 400, false, "Order not delivered yet.");
+    }
+
+    // Send delivery confirmation
+    await sendDeliveryConfirmation(order);
+
+    // Request product review
+    await requestProductReview(order);
+
+    // Offer re-purchase suggestions
+    const suggestions = await getProductSuggestions(order);
+
+    return apiResponse(res, 200, true, "Post-order actions completed.", {
+      suggestions,
+    });
+  } catch (error) {
+    console.error("Error in post-order actions:", error);
+    return apiResponse(res, 500, false, "Error in post-order actions.");
+  }
+};
+
+const sendDeliveryConfirmation = async (order: any) => {
+  const user = order.user_id;
+  const emailContent = `
+    Dear ${user.first_name},
+    Your order ${order._id} was successfully delivered.
+    We hope you love your purchase!
+  `;
+  await sendEmail(user.email, "Order Delivered", emailContent);
+};
+
+const requestProductReview = async (order: any) => {
+  const user = order.user_id;
+  const emailContent = `
+    Dear ${user.first_name},
+    Please share your feedback for order ${order._id}.
+    Your review helps us improve!
+    [Review Link]
+  `;
+  await sendEmail(user.email, "We Value Your Feedback", emailContent);
+};
+
+const getProductSuggestions = async (order: any) => {
+  const productIds = order.products.map((p: any) => p.productId);
+  const relatedProducts = await productModel
+    .find({
+      _id: { $nin: productIds },
+      category_id: order.products[0].productId.category_id,
+    })
+    .limit(5);
+  return relatedProducts;
+};
+
+// Admin: Shipping Performance Analytics
+const getShippingAnalytics = async (req: any, res: Response) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    const orders = await orderModel
+      .find({
+        orderDate: { $gte: new Date(startDate), $lte: new Date(endDate) },
+        orderStatus: { $in: ["Shipped", "Delivered"] },
+      })
+      .populate("shippingAddressId");
+
+    const analytics: any = {
+      totalOrders: orders.length,
+      delayedOrders: 0,
+      courierPerformance: {},
+    };
+
+    for (const order of orders) {
+      const shipping = await ShippingModel.findOne({ orderId: order._id });
+      if (shipping && shipping.deliveredAt) {
+        const deliveryTime =
+          (shipping.deliveredAt.getTime() - shipping.shippedAt.getTime()) /
+          (1000 * 60 * 60 * 24);
+        if (deliveryTime > shipping.estimatedDeliveryDate) {
+          analytics.delayedOrders++;
+        }
+
+        const courier = shipping.courierService || "Unknown";
+        analytics.courierPerformance[courier] = analytics.courierPerformance[
+          courier
+        ] || { total: 0, delays: 0 };
+        analytics.courierPerformance[courier].total++;
+        if (deliveryTime > shipping.estimatedDeliveryDate) {
+          analytics.courierPerformance[courier].delays++;
+        }
+      }
+    }
+
+    return apiResponse(
+      res,
+      200,
+      true,
+      "Shipping analytics retrieved.",
+      analytics
+    );
+  } catch (error) {
+    console.error("Error in shipping analytics:", error);
+    return apiResponse(res, 500, false, "Error retrieving shipping analytics.");
+  }
+};
+
+// Helper for ShipRocket Token
+const getShipRocketToken = async (): Promise<string> => {
+  if (shipRocketConfig.token) return shipRocketConfig.token;
+
+  try {
+    const response = await axios.post<{ token: string }>(
+      `${shipRocketConfig.baseUrl}/v1/external/auth/login`,
+      {
+        email: shipRocketConfig.email,
+        password: shipRocketConfig.password,
+      },
+      { headers: { "Content-Type": "application/json" } }
+    );
+
+    shipRocketConfig.token = response.data.token;
+    return shipRocketConfig.token;
+  } catch (error: any) {
+    console.error(
+      "Error authenticating with ShipRocket:",
+      error.response?.data || error.message
+    );
+    throw new Error("Failed to authenticate with ShipRocket.");
+  }
+};
+
+// Get Order by ID
 const getOrderById = async (req: any, res: Response) => {
   try {
     const { orderId } = req.params;
@@ -224,68 +1256,7 @@ const getOrderById = async (req: any, res: Response) => {
   }
 };
 
-const cancelOrder = async (req: any, res: Response) => {
-  try {
-    const { orderId } = req.params;
-    const userId = req?.user?.id;
-
-    if (!mongoose.Types.ObjectId.isValid(orderId)) {
-      return apiResponse(res, 400, false, "Invalid OrderId");
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return apiResponse(res, 400, false, "Invalid userId");
-    }
-
-    // Fetch the order to cancel
-    const order = await orderModel.findById(orderId);
-    if (!order) {
-      return apiResponse(res, 404, false, "Order not found");
-    }
-
-    if (order.user_id.toString() !== userId) {
-      return apiResponse(
-        res,
-        403,
-        false,
-        "You are not authorized to cancel this order"
-      );
-    }
-
-    if (order.orderStatus === "Cancelled") {
-      return apiResponse(res, 400, false, "Order Already Cancelled");
-    }
-
-    // Updating the order status
-    order.orderStatus = "Cancelled";
-    const cancelOrder = await order.save();
-
-    // Check if shipping exists and cancel it
-    const shipping = await ShippingModel.findOne({
-      orderId: orderId,
-    });
-
-    if (!shipping) {
-      return apiResponse(res, 400, false, "Shipping not found for this order");
-    }
-
-    shipping.shippingStatus = "Cancelled";
-    await shipping.save();
-
-    // Cancel the order on ShipRocket
-    const shipRocketResponse = await cancelShipRocketOrder(
-      orderId,
-      cancelOrder.shipRocketOrderId
-    );
-
-    // Send success response
-    return apiResponse(res, 200, true, "Order Cancelled Successfully");
-  } catch (error) {
-    console.error("Error while canceling the order", error);
-    return apiResponse(res, 500, false, "Error while canceling the order");
-  }
-};
-
+// Exchange Order
 const exchangeOrder = async (req: any, res: Response) => {
   try {
     const { orderId } = req.params;
@@ -419,253 +1390,17 @@ const exchangeOrder = async (req: any, res: Response) => {
   }
 };
 
-const trackOrder = async (req: Request, res: Response) => {
-  try {
-    const { orderId } = req.params;
-
-    if (!orderId) {
-      return apiResponse(res, 400, false, "Order ID is required.");
-    }
-
-    const order = await orderModel.findById(orderId);
-    if (!order) {
-      return apiResponse(res, 404, false, "Order not found.");
-    }
-
-    const shipRocketOrderId = order.shipRocketOrderId;
-    if (!shipRocketOrderId) {
-      return apiResponse(
-        res,
-        404,
-        false,
-        "ShipRocket Order ID not found for this order."
-      );
-    }
-
-    const orderDetails = await getOrderDetailsFromShipRocket(shipRocketOrderId);
-
-    if (!orderDetails) {
-      return apiResponse(
-        res,
-        404,
-        false,
-        "Unable to fetch order details from ShipRocket."
-      );
-    }
-
-    const shipmentId = orderDetails?.data?.shipments?.id;
-
-    if (!shipmentId) {
-      return apiResponse(
-        res,
-        404,
-        false,
-        "Shipment ID not found in ShipRocket order details."
-      );
-    }
-
-    const trackingDetails = await shipRocketTrackOrder(shipmentId);
-    if (trackingDetails) {
-      return apiResponse(
-        res,
-        200,
-        true,
-        "Order tracking details retrieved successfully.",
-        trackingDetails
-      );
-    }
-
-    return apiResponse(res, 404, false, "Order tracking details not found.");
-  } catch (error) {
-    console.error("Error tracking order:", error);
-    return apiResponse(res, 500, false, "Error tracking order.");
-  }
-};
-
-// TODO: Complete this Return Order Request
-const returnOrder = async (req: any, res: Response) => {
-  try {
-    const { orderId } = req.params;
-    const userId = req?.user?.id;
-    const {
-      reason,
-      products,
-    }: {
-      reason: string;
-      products: { productId: string; quantity: number }[];
-    } = req.body;
-
-    if (!mongoose.Types.ObjectId.isValid(orderId)) {
-      return apiResponse(res, 400, false, "Invalid order ID.");
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return apiResponse(res, 400, false, "Invalid user ID.");
-    }
-
-    if (!reason || !products || products.length === 0) {
-      return apiResponse(
-        res,
-        400,
-        false,
-        "Please provide a reason and products."
-      );
-    }
-
-    // Fetch the order
-    const order = await orderModel.findById(orderId);
-    if (!order) {
-      return apiResponse(res, 404, false, "Order not found.");
-    }
-
-    if (order.user_id.toString() !== userId) {
-      return apiResponse(
-        res,
-        403,
-        false,
-        "Access Denied: Order does not belong to user."
-      );
-    }
-
-    if (order.orderStatus === "Cancelled") {
-      return apiResponse(res, 403, false, "Order is already cancelled.");
-    }
-
-    if (order.orderStatus !== "Delivered") {
-      return apiResponse(
-        res,
-        403,
-        false,
-        "Only delivered orders can be returned."
-      );
-    }
-
-    const invalidProducts: string[] = [];
-    for (const item of products) {
-      const { productId, quantity } = item;
-      const orderProduct = order.products.find(
-        (p: any) =>
-          p.productId.toString() === productId && p.quantity >= quantity
-      );
-
-      if (!orderProduct) {
-        invalidProducts.push(productId);
-      }
-    }
-
-    if (invalidProducts.length > 0) {
-      return apiResponse(
-        res,
-        400,
-        false,
-        `Invalid products or quantities in the request: ${invalidProducts.join(
-          ", "
-        )}`
-      );
-    }
-
-    for (const { productId, quantity } of products) {
-      const productDetails = await productModel.findById(productId);
-      if (productDetails) {
-        productDetails.stock += quantity;
-        await productDetails.save();
-      }
-    }
-
-    order.orderStatus = "Return Requested";
-    order.shippingStatus = "Returned";
-    order.products = order.products.map((p: any) => {
-      const matchingProduct = products.find(
-        (prod) => prod.productId === p.productId.toString()
-      );
-      if (matchingProduct) {
-        return {
-          ...p,
-          returnRequested: true,
-          reason,
-        };
-      }
-      return p;
-    });
-
-    const updatedOrder = await order.save();
-
-    // Update shipping status if applicable
-    const shipping = await ShippingModel.findOne({ orderId });
-    if (shipping) {
-      shipping.shippingStatus = "Returned";
-      await shipping.save();
-    }
-
-    // Fetch order details from ShipRocket
-    const shipRocketOrderId = order.shipRocketOrderId;
-    const details = await getOrderDetailsFromShipRocket(shipRocketOrderId);
-
-    if (!details) {
-      return apiResponse(
-        res,
-        400,
-        false,
-        "Error fetching details from ShipRocket."
-      );
-    }
-
-    const { data } = details;
-    const shipRocketPayload = {
-      order_id: order._id,
-      order_date: order.orderDate,
-      channel_id: data.channel_id,
-      pickup_customer_name: data.customer_name,
-      pickup_email: data.customer_email,
-      pickup_phone: data.customer_phone,
-      pickup_address: data.customer_address,
-      pickup_city: data.customer_city,
-      pickup_state: data.customer_state,
-      pickup_pincode: data.customer_pincode,
-      pickup_country: data.customer_country,
-      shipping_customer_name: data.customer_name,
-      shipping_email: data.customer_email,
-      shipping_phone: data.customer_phone,
-      shipping_address: data.customer_address,
-      shipping_city: data.customer_city,
-      shipping_state: data.customer_state,
-      shipping_pincode: data.customer_pincode,
-      shipping_country: data.customer_country,
-      order_items: products.map((p) => ({
-        name: p.productId,
-        sku: p.productId,
-        units: p.quantity,
-        selling_price: "1200",
-      })),
-      payment_method: data.payment_method,
-      sub_total: data.total,
-      length: data.shipments.length,
-      breadth: data.shipments.breadth,
-      height: data.shipments.height,
-      weight: data.shipments.weight,
-    };
-
-    const shipRocketResponse = await shipRocketReturnOrder(shipRocketPayload);
-    if (!shipRocketResponse) {
-      return apiResponse(res, 400, false, "ShipRocket API response error.");
-    }
-
-    return apiResponse(res, 200, true, "Return Order Successfully", {
-      updatedOrder,
-      shipRocketResponse,
-    });
-  } catch (error) {
-    console.error("Error while Return Order", error);
-    return apiResponse(res, 500, false, "Error while Return Order");
-  }
-};
-
 export {
+  addProductToCart,
+  calculateShippingCharges,
   cancelOrder,
   createOrder,
   exchangeOrder,
   getOrderById,
+  getShippingAnalytics,
+  postOrderActions,
   returnOrder,
+  shipOrder,
   trackOrder
 };
 

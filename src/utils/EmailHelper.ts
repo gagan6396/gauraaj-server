@@ -1,13 +1,12 @@
-import nodemailer from "nodemailer";
 import crypto from "crypto";
-import apiResponse from "./ApiResponse";
+import nodemailer from "nodemailer";
 
 const generateOtp = () => {
   return crypto.randomInt(100000, 999999).toString();
 };
 
 // Sending the email
-const sendEmail = async (to: string, subject: string, text: string) => {
+export const sendEmail = async (to: string, subject: string, text: string) => {
   try {
     const transporter = nodemailer.createTransport({
       service: "gmail",
@@ -48,4 +47,5 @@ const sendOtpEmail = async (email: string): Promise<string> => {
   }
 };
 
-export { sendOtpEmail, generateOtp };
+export { generateOtp, sendOtpEmail };
+

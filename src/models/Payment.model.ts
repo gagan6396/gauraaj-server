@@ -3,20 +3,13 @@ import mongoose, { Document, Model, Schema } from "mongoose";
 export interface Payment extends Document {
   userId: mongoose.Types.ObjectId;
   orderId: mongoose.Types.ObjectId;
-  paymentMethod:
-    | "UPI"
-    | "COD"
-    | "Razorpay"
-    | "Credit Card"
-    | "Debit Card"
-    | "Net Banking"
-    | "Wallet";
+  paymentMethod: "Razorpay" | "COD";
   transactionId: string;
-  amount: mongoose.Types.Decimal128;
+  amount: number;
   status: "Pending" | "Completed" | "Failed" | "Refunded";
   refundDetails?: {
     refundId?: string;
-    amount?: mongoose.Types.Decimal128;
+    amount?: number;
     reason?: string;
     refundedAt?: Date;
   };
@@ -37,15 +30,7 @@ const paymentSchema: Schema<Payment> = new Schema(
     },
     paymentMethod: {
       type: String,
-      enum: [
-        "UPI",
-        "COD",
-        "Razorpay",
-        "Credit Card",
-        "Debit Card",
-        "Net Banking",
-        "Wallet",
-      ],
+      enum: ["Razorpay", "COD"],
       required: true,
     },
     transactionId: {
@@ -53,8 +38,9 @@ const paymentSchema: Schema<Payment> = new Schema(
       required: true,
     },
     amount: {
-      type: mongoose.Types.Decimal128,
+      type: Number,
       required: true,
+      min: [0, "Amount cannot be negative"],
     },
     status: {
       type: String,
@@ -64,11 +50,17 @@ const paymentSchema: Schema<Payment> = new Schema(
     refundDetails: {
       refundId: {
         type: String,
-        default: null, // Allow null values explicitly
+        default: null,
       },
-      amount: { type: mongoose.Types.Decimal128 },
-      reason: { type: String },
-      refundedAt: { type: Date },
+      amount: {
+        type: Number,
+      },
+      reason: {
+        type: String,
+      },
+      refundedAt: {
+        type: Date,
+      },
     },
   },
   {
@@ -76,7 +68,7 @@ const paymentSchema: Schema<Payment> = new Schema(
   }
 );
 
-// Drop the existing index on `refundDetails.refundId` if it exists
+// Drop conflicting index if it exists
 paymentSchema.pre("save", async function (next) {
   const collection = (this.constructor as Model<Document>).collection;
   const indexes = await collection.indexes();
@@ -93,7 +85,6 @@ paymentSchema.pre("save", async function (next) {
   next();
 });
 
-// Define the model and handle reinitialization
 const PaymentModel =
   mongoose.models.Payment || mongoose.model<Payment>("Payment", paymentSchema);
 
