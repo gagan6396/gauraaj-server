@@ -22,7 +22,7 @@ export const sendEmail = async (to: string, subject: string, text: string) => {
       from: process.env.EMAIL_USER,
       to: to,
       subject: subject,
-      text: text,
+      html: text, // HTML body
     };
 
     const info = await transporter.sendMail(mailOptions);
@@ -40,7 +40,7 @@ const sendOtpEmail = async (email: string): Promise<string> => {
 
   try {
     await sendEmail(email, subject, text);
-    return otp; 
+    return otp;
   } catch (error) {
     console.error("Error sending OTP email", error);
     throw new Error("Error sending Email");

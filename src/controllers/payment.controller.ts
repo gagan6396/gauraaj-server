@@ -62,7 +62,6 @@ const createOrder = async (req: Request, res: Response) => {
 };
 
 // Verify Razorpay Payment
-
 const verifyPayment = async (req: Request, res: Response) => {
   try {
     const { orderId, addressSnapshot, paymentMethod } = req.body;
@@ -86,11 +85,9 @@ const verifyPayment = async (req: Request, res: Response) => {
         "Invalid or incomplete address snapshot"
       );
     }
-    console.log("Payment method:", paymentMethod);
     if (!Number.isInteger(paymentMethod) || ![0, 1].includes(paymentMethod)) {
       return apiResponse(res, 400, false, "Invalid payment method");
     }
-    
 
     // Fetch order
     const order = await orderModel.findById(orderId);
@@ -149,7 +146,6 @@ const verifyPayment = async (req: Request, res: Response) => {
       { new: true }
     );
     if (!updatedOrder) {
-      // Rollback payment status
       await PaymentModel.findByIdAndUpdate(payment._id, { status: "Pending" });
       return apiResponse(res, 404, false, "Order not found during update");
     }
@@ -188,7 +184,6 @@ const verifyPayment = async (req: Request, res: Response) => {
         error: shipRocketError.message,
         details: shipRocketError instanceof Error ? shipRocketError : "Unknown error",
       });
-      // Rollback database changes
       await ShippingModel.deleteOne({ _id: savedShipping._id });
       await orderModel.findByIdAndUpdate(orderId, {
         orderStatus: "Pending",
@@ -206,15 +201,209 @@ const verifyPayment = async (req: Request, res: Response) => {
 
     await updatedOrder.save();
 
-    // Send confirmation email
+    // Embedded email template
+    const emailTemplate = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order Confirmation</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 600px;
+      margin: 20px auto;
+      background-color: #ffffff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+    .header {
+      text-align: center;
+      padding: 20px 0;
+      background-color: #007bff;
+      color: #ffffff;
+      border-radius: 8px 8px 0 0;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+    .content {
+      padding: 20px;
+    }
+    .content h2 {
+      color: #333333;
+      font-size: 20px;
+      margin-top: 0;
+    }
+    .content p {
+      color: #666666;
+      line-height: 1.6;
+      margin: 10px 0;
+    }
+    .order-details {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+    }
+    .order-details th,
+    .order-details td {
+      border: 1px solid #dddddd;
+      padding: 10px;
+      text-align: left;
+    }
+    .order-details th {
+      background-color: #f8f8f8;
+      color: #333333;
+    }
+    .footer {
+      text-align: center;
+      padding: 20px;
+      color: #999999;
+      font-size: 12px;
+    }
+    .footer a {
+      color: #007bff;
+      text-decoration: none;
+    }
+    .button {
+      display: inline-block;
+      padding: 10px 20px;
+      margin: 10px 0;
+      background-color: #007bff;
+      color: #ffffff;
+      text-decoration: none;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>{{emailTitle}}</h1>
+    </div>
+    <div class="content">
+      <h2>{{greeting}}</h2>
+      <p>{{mainMessage}}</p>
+      <h3>Order Details</h3>
+      <table class="order-details">
+        <tr>
+          <th>Order ID</th>
+          <td>{{orderId}}</td>
+        </tr>
+        <tr>
+          <th>Order Date</th>
+          <td>{{orderDate}}</td>
+        </tr>
+        <tr>
+          <th>Total Amount</th>
+          <td>{{totalAmount}}</td>
+        </tr>
+        <tr>
+          <th>Payment Method</th>
+          <td>{{paymentMethod}}</td>
+        </tr>
+        <tr>
+          <th>Shipping Address</th>
+          <td>{{shippingAddress}}</td>
+        </tr>
+        <tr>
+          <th>Estimated Delivery</th>
+          <td>{{estimatedDeliveryDate}}</td>
+        </tr>
+        {{additionalDetails}}
+      </table>
+      <p>{{closingMessage}}</p>
+      <a href="{{actionUrl}}" class="button">{{actionText}}</a>
+    </div>
+    <div class="footer">
+      <p>Thank you for choosing us!</p>
+      <p>{{companyName}} | <a href="{{companyWebsite}}">Visit our website</a></p>
+      <p>Contact us at <a href="mailto:{{supportEmail}}">{{supportEmail}}</a></p>
+    </div>
+  </div>
+</body>
+</html>
+`;
+
+    // Prepare common email data
+    const emailData = {
+      orderId: orderId.toString(),
+      orderDate: new Date().toLocaleDateString(),
+      totalAmount: `₹${order.totalAmount.toFixed(2)}`,
+      paymentMethod: paymentMethod === 0 ? "Razorpay" : "Cash on Delivery",
+      shippingAddress: `${addressSnapshot.addressLine1}, ${addressSnapshot.city}, ${addressSnapshot.state}, ${addressSnapshot.postalCode}, ${addressSnapshot.country}`,
+      estimatedDeliveryDate: new Date(
+        Date.now() + estimatedDeliveryDays * 24 * 60 * 60 * 1000
+      ).toLocaleDateString(),
+      companyName: "Gauraaj",
+      companyWebsite: "https://www.gauraaj.com/",
+      supportEmail: "ghccustomercare@gmail.com",
+    };
+
+    // Send email to customer
     try {
+      const customerEmailBody = emailTemplate
+        .replace("{{emailTitle}}", "Order Confirmation")
+        .replace("{{greeting}}", `Dear ${order.userDetails?.name || "Customer"}`)
+        .replace("{{mainMessage}}", "Thank you for your order! We're excited to let you know that your order has been confirmed and is being prepared for shipping.")
+        .replace("{{orderId}}", emailData.orderId)
+        .replace("{{orderDate}}", emailData.orderDate)
+        .replace("{{totalAmount}}", emailData.totalAmount)
+        .replace("{{paymentMethod}}", emailData.paymentMethod)
+        .replace("{{shippingAddress}}", emailData.shippingAddress)
+        .replace("{{estimatedDeliveryDate}}", emailData.estimatedDeliveryDate)
+        .replace("{{additionalDetails}}", "")
+        .replace("{{closingMessage}}", "We'll notify you once your order ships. If you have any questions, feel free to contact us.")
+        .replace("{{actionUrl}}", "https://www.gauraaj.com/")
+        .replace("{{actionText}}", "View Your Order")
+        .replace("{{companyName}}", emailData.companyName)
+        .replace("{{companyWebsite}}", emailData.companyWebsite)
+        .replace("{{supportEmail}}", emailData.supportEmail);
+
       await sendEmail(
         order.userDetails?.email || "",
         "Order Confirmed",
-        `Dear ${order.userDetails?.name || "Customer"},\nYour order ${orderId} has been confirmed. Estimated delivery in ${estimatedDeliveryDays} days.`
+        customerEmailBody
       );
     } catch (emailError) {
-      console.warn("Failed to send confirmation email:", emailError);
+      console.warn("Failed to send customer confirmation email:", emailError);
+    }
+
+    // Send email to shop owner
+    try {
+      const shopOwnerEmailBody = emailTemplate
+        .replace("{{emailTitle}}", "New Order Notification")
+        .replace("{{greeting}}", "Dear Shop Owner")
+        .replace("{{mainMessage}}", "A new order has been placed and confirmed. Please review the details below and prepare for shipping.")
+        .replace("{{orderId}}", emailData.orderId)
+        .replace("{{orderDate}}", emailData.orderDate)
+        .replace("{{totalAmount}}", emailData.totalAmount)
+        .replace("{{paymentMethod}}", emailData.paymentMethod)
+        .replace("{{shippingAddress}}", emailData.shippingAddress)
+        .replace("{{estimatedDeliveryDate}}", emailData.estimatedDeliveryDate)
+        .replace("{{additionalDetails}}", `<tr><th>Customer Name</th><td>${order.userDetails?.name || "N/A"}</td></tr>`)
+        .replace("{{closingMessage}}", "Please ensure the order is processed and shipped on time. Contact support if you encounter any issues.")
+        .replace("{{actionUrl}}", "https://www.gauraaj.com/")
+        .replace("{{actionText}}", "View Order in Dashboard")
+        .replace("{{companyName}}", emailData.companyName)
+        .replace("{{companyWebsite}}", emailData.companyWebsite)
+        .replace("{{supportEmail}}", emailData.supportEmail);
+
+      await sendEmail(
+        "ghccustomercare@gmail.com", // Replace with actual shop owner email
+        "New Order Received",
+        shopOwnerEmailBody
+      );
+    } catch (emailError) {
+      console.warn("Failed to send shop owner notification email:", emailError);
     }
 
     return apiResponse(res, 200, true, "Order verified successfully", {
