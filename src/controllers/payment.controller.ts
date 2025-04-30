@@ -105,7 +105,8 @@ const verifyPayment = async (req: Request, res: Response) => {
 
     // Verify payment signature for Razorpay
     if (paymentMethod === 0) {
-      const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+      const { razorpay_order_id, razorpay_payment_id, razorpay_signature } =
+        req.body;
       if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
         return apiResponse(
           res,
@@ -176,13 +177,15 @@ const verifyPayment = async (req: Request, res: Response) => {
         addressSnapshot,
         totalAmount: order.totalAmount,
         paymentMethod: order.paymentMethod,
+        courierName: order.courierService || "Default Courier",
       });
       updatedOrder.shipRocketOrderId = shipRocketResponse.order_id;
     } catch (shipRocketError: any) {
       console.error("ShipRocket integration failed:", {
         orderId,
         error: shipRocketError.message,
-        details: shipRocketError instanceof Error ? shipRocketError : "Unknown error",
+        details:
+          shipRocketError instanceof Error ? shipRocketError : "Unknown error",
       });
       await ShippingModel.deleteOne({ _id: savedShipping._id });
       await orderModel.findByIdAndUpdate(orderId, {
@@ -322,6 +325,7 @@ const verifyPayment = async (req: Request, res: Response) => {
       </table>
       <p>{{closingMessage}}</p>
       <a href="{{actionUrl}}" class="button">{{actionText}}</a>
+      <p>Contact us on WhatsApp: <a href="{{whatsAppUrl}}">{{whatsAppNumber}}</a></p>
     </div>
     <div class="footer">
       <p>Thank you for choosing us!</p>
@@ -346,14 +350,22 @@ const verifyPayment = async (req: Request, res: Response) => {
       companyName: "Gauraaj",
       companyWebsite: "https://www.gauraaj.com/",
       supportEmail: "ghccustomercare@gmail.com",
+      whatsAppNumber: "+91-6397-90-4655",
+      whatsAppUrl: "https://wa.me/+916397904655",
     };
 
     // Send email to customer
     try {
       const customerEmailBody = emailTemplate
         .replace("{{emailTitle}}", "Order Confirmation")
-        .replace("{{greeting}}", `Dear ${order.userDetails?.name || "Customer"}`)
-        .replace("{{mainMessage}}", "Thank you for your order! We're excited to let you know that your order has been confirmed and is being prepared for shipping.")
+        .replace(
+          "{{greeting}}",
+          `Dear ${order.userDetails?.name || "Customer"}`
+        )
+        .replace(
+          "{{mainMessage}}",
+          "Thank you for your order! We're excited to let you know that your order has been confirmed and is being prepared for shipping."
+        )
         .replace("{{orderId}}", emailData.orderId)
         .replace("{{orderDate}}", emailData.orderDate)
         .replace("{{totalAmount}}", emailData.totalAmount)
@@ -361,12 +373,17 @@ const verifyPayment = async (req: Request, res: Response) => {
         .replace("{{shippingAddress}}", emailData.shippingAddress)
         .replace("{{estimatedDeliveryDate}}", emailData.estimatedDeliveryDate)
         .replace("{{additionalDetails}}", "")
-        .replace("{{closingMessage}}", "We'll notify you once your order ships. If you have any questions, feel free to contact us.")
-        .replace("{{actionUrl}}", "https://www.gauraaj.com/")
+        .replace(
+          "{{closingMessage}}",
+          "We'll notify you once your order ships. If you have any questions, feel free to contact us."
+        )
+        .replace("{{actionUrl}}", `https://www.gauraaj.com/order-confirmation/${emailData.orderId}`)
         .replace("{{actionText}}", "View Your Order")
         .replace("{{companyName}}", emailData.companyName)
         .replace("{{companyWebsite}}", emailData.companyWebsite)
-        .replace("{{supportEmail}}", emailData.supportEmail);
+        .replace("{{supportEmail}}", emailData.supportEmail)
+        .replace("{{whatsAppNumber}}", emailData.whatsAppNumber)
+        .replace("{{whatsAppUrl}}", emailData.whatsAppUrl);
 
       await sendEmail(
         order.userDetails?.email || "",
@@ -374,7 +391,11 @@ const verifyPayment = async (req: Request, res: Response) => {
         customerEmailBody
       );
     } catch (emailError) {
-      console.warn("Failed to send customer confirmation email:", emailError);
+      console.error("Failed to send customer confirmation email:", {
+        error: emailError instanceof Error ? emailError.message : "Unknown error",
+        stack: emailError instanceof Error ? emailError.stack : "Unknown stack",
+        orderId,
+      });
     }
 
     // Send email to shop owner
@@ -382,20 +403,34 @@ const verifyPayment = async (req: Request, res: Response) => {
       const shopOwnerEmailBody = emailTemplate
         .replace("{{emailTitle}}", "New Order Notification")
         .replace("{{greeting}}", "Dear Shop Owner")
-        .replace("{{mainMessage}}", "A new order has been placed and confirmed. Please review the details below and prepare for shipping.")
+        .replace(
+          "{{mainMessage}}",
+          "A new order has been placed and confirmed. Please review the details below and prepare for shipping."
+        )
         .replace("{{orderId}}", emailData.orderId)
         .replace("{{orderDate}}", emailData.orderDate)
         .replace("{{totalAmount}}", emailData.totalAmount)
         .replace("{{paymentMethod}}", emailData.paymentMethod)
         .replace("{{shippingAddress}}", emailData.shippingAddress)
         .replace("{{estimatedDeliveryDate}}", emailData.estimatedDeliveryDate)
-        .replace("{{additionalDetails}}", `<tr><th>Customer Name</th><td>${order.userDetails?.name || "N/A"}</td></tr>`)
-        .replace("{{closingMessage}}", "Please ensure the order is processed and shipped on time. Contact support if you encounter any issues.")
-        .replace("{{actionUrl}}", "https://www.gauraaj.com/")
+        .replace(
+          "{{additionalDetails}}",
+          `<tr><th>Customer Name</th><td>${
+            order.userDetails?.name || "N/A"
+          }</td></tr>
+           <tr><th>Customer Phone</th><td><a href="https://wa.me/${order.userDetails?.phone || ""}">${order.userDetails?.phone || "N/A"}</a></td></tr>`
+        )
+        .replace(
+          "{{closingMessage}}",
+          "Please ensure the order is processed and shipped on time. Contact support if you encounter any issues."
+        )
+        .replace("{{actionUrl}}", `https://gauraaj-admin.vercel.app/admin/orders/${emailData.orderId}`)
         .replace("{{actionText}}", "View Order in Dashboard")
         .replace("{{companyName}}", emailData.companyName)
         .replace("{{companyWebsite}}", emailData.companyWebsite)
-        .replace("{{supportEmail}}", emailData.supportEmail);
+        .replace("{{supportEmail}}", emailData.supportEmail)
+        .replace("{{whatsAppNumber}}", emailData.whatsAppNumber)
+        .replace("{{whatsAppUrl}}", emailData.whatsAppUrl);
 
       await sendEmail(
         "ghccustomercare@gmail.com", // Replace with actual shop owner email
@@ -403,7 +438,11 @@ const verifyPayment = async (req: Request, res: Response) => {
         shopOwnerEmailBody
       );
     } catch (emailError) {
-      console.warn("Failed to send shop owner notification email:", emailError);
+      console.error("Failed to send shop owner notification email:", {
+        error: emailError instanceof Error ? emailError.message : "Unknown error",
+        stack: emailError instanceof Error ? emailError.stack : "Unknown stack",
+        orderId,
+      });
     }
 
     return apiResponse(res, 200, true, "Order verified successfully", {

@@ -6,10 +6,10 @@ const JWT_REFRESH_SECRET =
 
 // Generate access token
 export const generateToken = (payload: object) => {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "100y" });
+  return jwt.sign(payload, JWT_SECRET);
 };
 
 // Generate refresh token
 export const generateRefreshToken = (payload: object) => {
-  return jwt.sign(payload, JWT_REFRESH_SECRET, { expiresIn: "100y" });
+  return jwt.sign(payload, JWT_REFRESH_SECRET);
 };

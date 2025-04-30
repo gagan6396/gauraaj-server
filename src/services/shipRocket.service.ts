@@ -76,12 +76,14 @@ export const getShipRocketToken = async (): Promise<string> => {
 
 // Create Shiprocket order
 
+
 const createShipRocketOrder = async (data: {
   orderId: string;
   products: any[];
   addressSnapshot: any;
   totalAmount: number;
   paymentMethod: number;
+  courierName: string; // Added courierName to input
 }) => {
   try {
     // Validate required fields
@@ -100,6 +102,9 @@ const createShipRocketOrder = async (data: {
         data.addressSnapshot.phone
       );
       data.addressSnapshot.phone = "9876543210"; // Fallback for testing
+    }
+    if (!data.courierName) {
+      throw new Error("Courier name is required for Shiprocket order");
     }
 
     const token = await getShipRocketToken();
@@ -139,7 +144,7 @@ const createShipRocketOrder = async (data: {
         };
       }),
       payment_method: data.paymentMethod === 1 ? "COD" : "Prepaid",
-      shipping_charges: 0,
+      shipping_charges: 0, // Will be updated post-courier assignment
       giftwrap_charges: 0,
       transaction_charges: 0,
       total_discount: data.products.reduce(
@@ -191,6 +196,7 @@ const createShipRocketOrder = async (data: {
         ),
         0.5
       ),
+      courier_name: data.courierName.toLowerCase(), // Normalize to lowercase for Shiprocket
     };
 
     // Log payload for debugging
@@ -231,7 +237,6 @@ const createShipRocketOrder = async (data: {
     throw new Error(`Shiprocket error: ${errorDetails.message}`);
   }
 };
-
 const cancelShipRocketOrder = async (
   orderId: string,
   shipRocketOrderId: number

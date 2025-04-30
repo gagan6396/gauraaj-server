@@ -326,7 +326,7 @@ const createOrder = async (req: any, res: Response) => {
       shippingAddress,
       paymentMethod,
       userDetails,
-      shippingMethod,
+      courierName,
     } = req.body;
 
     console.log(
@@ -339,7 +339,7 @@ const createOrder = async (req: any, res: Response) => {
       "User details:",
       userDetails,
       "Shipping method:",
-      shippingMethod,
+      courierName,
       "User ID:",
       userId
     );
@@ -349,7 +349,7 @@ const createOrder = async (req: any, res: Response) => {
       !products?.length ||
       !shippingAddress ||
       !userDetails ||
-      !shippingMethod ||
+      !courierName ||
       !Number.isInteger(paymentMethod) ||
       ![0, 1].includes(paymentMethod)
     ) {
@@ -361,7 +361,7 @@ const createOrder = async (req: any, res: Response) => {
     const shippingCharges = await calculateShippingChargesForOrder(
       products,
       shippingAddress.postalCode,
-      shippingMethod,
+      courierName,
       isCOD
     );
 
@@ -454,6 +454,8 @@ const createOrder = async (req: any, res: Response) => {
       razorpayOrderId: paymentMethod === 0 ? paymentData.transactionId : null,
     });
   } catch (error: any) {
+    console.log("Error creating order:", error);
+    
     console.error("Order creation failed:", {
       message: error.message,
       stack: error.stack,
@@ -526,7 +528,7 @@ const processProducts = async (products: any[]) => {
 const calculateShippingChargesForOrder = async (
   products: any[],
   postalCode: string,
-  shippingMethod: string,
+  courierName: string, // Changed from shippingMethod to courierName
   isCOD: number
 ) => {
   try {
@@ -597,16 +599,14 @@ const calculateShippingChargesForOrder = async (
       throw new Error("No couriers available for this location.");
     }
 
-    // Filter couriers based on the shippingMethod matching the 'type' field
+    // Find the courier matching the provided courier_name
     const selectedCourier = couriers.find(
-      (c: any) =>
-        c.courier_name &&
-        (shippingMethod === "Standard" ? !c.is_express : c.is_express)
+      (c: any) => c.courier_name.toLowerCase() === courierName.toLowerCase()
     );
 
     if (!selectedCourier) {
       console.error("Available couriers:", couriers);
-      throw new Error(`No ${shippingMethod} couriers available.`);
+      throw new Error(`Courier '${courierName}' not available.`);
     }
 
     return {
@@ -627,10 +627,7 @@ const calculateShippingChargesForOrder = async (
         errors: error.response?.data?.errors,
         requestParams: {
           postalCode,
-          // totalWeight,
-          // totalDimensions,
           isCOD,
-          // subTotal,
         },
       });
       throw new Error(errorMessage);
