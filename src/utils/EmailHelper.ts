@@ -6,7 +6,16 @@ const generateOtp = () => {
 };
 
 // Sending the email
-export const sendEmail = async (to: string, subject: string, text: string) => {
+export const sendEmail = async (
+  to: string,
+  subject: string,
+  html: string,
+  options: {
+    from?: string;
+    headers?: Record<string, string>;
+    replyTo?: string;
+  } = {}
+) => {
   try {
     const transporter = nodemailer.createTransport({
       service: "gmail",
@@ -19,17 +28,30 @@ export const sendEmail = async (to: string, subject: string, text: string) => {
     });
 
     const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: to,
-      subject: subject,
-      html: text, // HTML body
+      from: options.from || `"Gauraaj" <${process.env.EMAIL_USER}>`,
+      to,
+      subject: `${subject} | Gauraaj Order Update`,
+      html,
+      replyTo: options.replyTo || "ghccustomercare@gmail.com",
+      headers: {
+        "X-Mailer": "Gauraaj Transactional Email",
+        "X-Priority": "3",
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        ...options.headers,
+      },
     };
 
     const info = await transporter.sendMail(mailOptions);
+    console.log(`Email sent successfully to ${to}: ${info.messageId}`);
     return info;
-  } catch (error) {
-    console.error("Error sending Email", error);
-    throw new Error("Error sending Email");
+  } catch (error: any) {
+    console.error("Error sending email:", {
+      error: error.message,
+      stack: error.stack,
+      to,
+      subject,
+    });
+    throw new Error(`Failed to send email: ${error.message}`);
   }
 };
 

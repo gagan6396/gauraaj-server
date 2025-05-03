@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import Razorpay from "razorpay";
 import orderModel from "../models/Order.model";
 import PaymentModel from "../models/Payment.model";
+import productModel from "../models/Product.model";
 import ShippingModel from "../models/Shipping.model";
 import { createShipRocketOrder } from "../services/shipRocket.service";
 import apiResponse from "../utils/ApiResponse";
@@ -211,13 +212,15 @@ const verifyPayment = async (req: Request, res: Response) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <title>Order Confirmation</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
       background-color: #f4f4f4;
       margin: 0;
       padding: 0;
+      line-height: 1.6;
     }
     .container {
       max-width: 600px;
@@ -225,11 +228,11 @@ const verifyPayment = async (req: Request, res: Response) => {
       background-color: #ffffff;
       padding: 20px;
       border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     }
     .header {
       text-align: center;
-      padding: 20px 0;
+      padding: 20px;
       background-color: #007bff;
       color: #ffffff;
       border-radius: 8px 8px 0 0;
@@ -237,6 +240,7 @@ const verifyPayment = async (req: Request, res: Response) => {
     .header h1 {
       margin: 0;
       font-size: 24px;
+      font-weight: 600;
     }
     .content {
       padding: 20px;
@@ -245,32 +249,37 @@ const verifyPayment = async (req: Request, res: Response) => {
       color: #333333;
       font-size: 20px;
       margin-top: 0;
+      font-weight: 500;
     }
     .content p {
-      color: #666666;
-      line-height: 1.6;
+      color: #4a4a4a;
       margin: 10px 0;
     }
-    .order-details {
+    .order-details, .product-details {
       width: 100%;
       border-collapse: collapse;
       margin: 20px 0;
     }
     .order-details th,
-    .order-details td {
-      border: 1px solid #dddddd;
-      padding: 10px;
+    .order-details td,
+    .product-details th,
+    .product-details td {
+      border: 1px solid #e0e0e0;
+      padding: 12px;
       text-align: left;
     }
-    .order-details th {
+    .order-details th,
+    .product-details th {
       background-color: #f8f8f8;
       color: #333333;
+      font-weight: 600;
     }
     .footer {
       text-align: center;
       padding: 20px;
-      color: #999999;
+      color: #6b7280;
       font-size: 12px;
+      border-top: 1px solid #e0e0e0;
     }
     .footer a {
       color: #007bff;
@@ -278,12 +287,29 @@ const verifyPayment = async (req: Request, res: Response) => {
     }
     .button {
       display: inline-block;
-      padding: 10px 20px;
+      padding: 12px 24px;
       margin: 10px 0;
       background-color: #007bff;
       color: #ffffff;
       text-decoration: none;
       border-radius: 5px;
+      font-weight: 500;
+    }
+    .button:hover {
+      background-color: #0056b3;
+    }
+    @media only screen and (max-width: 600px) {
+      .container {
+        width: 100%;
+        margin: 10px;
+        padding: 10px;
+      }
+      .header h1 {
+        font-size: 20px;
+      }
+      .content h2 {
+        font-size: 18px;
+      }
     }
   </style>
 </head>
@@ -323,6 +349,19 @@ const verifyPayment = async (req: Request, res: Response) => {
         </tr>
         {{additionalDetails}}
       </table>
+      <h3>Products</h3>
+      <table class="product-details">
+        <tr>
+          <th>Product</th>
+          <th>Variant</th>
+          <th>SKU</th>
+          <th>Quantity</th>
+          <th>Price</th>
+          <th>Discount</th>
+          <th>Total</th>
+        </tr>
+        {{productRows}}
+      </table>
       <p>{{closingMessage}}</p>
       <a href="{{actionUrl}}" class="button">{{actionText}}</a>
       <p>Contact us on WhatsApp: <a href="{{whatsAppUrl}}">{{whatsAppNumber}}</a></p>
@@ -331,6 +370,7 @@ const verifyPayment = async (req: Request, res: Response) => {
       <p>Thank you for choosing us!</p>
       <p>{{companyName}} | <a href="{{companyWebsite}}">Visit our website</a></p>
       <p>Contact us at <a href="mailto:{{supportEmail}}">{{supportEmail}}</a></p>
+      <p style="margin-top: 10px;">If you no longer wish to receive these emails, <a href="{{unsubscribeUrl}}">unsubscribe here</a>.</p>
     </div>
   </div>
 </body>
@@ -352,7 +392,51 @@ const verifyPayment = async (req: Request, res: Response) => {
       supportEmail: "ghccustomercare@gmail.com",
       whatsAppNumber: "+91-6397-90-4655",
       whatsAppUrl: "https://wa.me/+916397904655",
+      unsubscribeUrl: `https://www.gauraaj.com?email=${encodeURIComponent(
+        order.userDetails?.email || ""
+      )}`,
     };
+
+    // Fetch product details and generate product rows
+    const productRows = await Promise.all(
+      order.products.map(async (orderProduct: any) => {
+        const product = await productModel.findById(orderProduct.productId);
+        let variant = null;
+        let discountDisplay = "N/A";
+
+        if (product) {
+          variant = product.variants.find(
+            (v: any) => v._id.toString() === orderProduct.variantId
+          );
+          if (variant && variant.discount?.active) {
+            const discountValue = variant.discount.value;
+            if (variant.discount.type === "percentage") {
+              discountDisplay = `${discountValue}%`;
+            } else if (variant.discount.type === "flat") {
+              discountDisplay = `₹${discountValue.toFixed(2)}`;
+            }
+          }
+        }
+
+        const productName = orderProduct.name || "Unknown Product";
+        const variantName = variant?.name || "Default Variant";
+        const sku = variant?.sku || "N/A";
+        const price = orderProduct.price || 0;
+        const quantity = orderProduct.quantity || 1;
+        const total = (price * quantity).toFixed(2);
+
+        return `
+          <tr>
+            <td>${productName}</td>
+            <td>${variantName}</td>
+            <td>${sku}</td>
+            <td>${quantity}</td>
+            <td>₹${price.toFixed(2)}</td>
+            <td>${discountDisplay}</td>
+            <td>₹${total}</td>
+          </tr>`;
+      })
+    ).then(rows => rows.join(""));
 
     // Send email to customer
     try {
@@ -373,26 +457,39 @@ const verifyPayment = async (req: Request, res: Response) => {
         .replace("{{shippingAddress}}", emailData.shippingAddress)
         .replace("{{estimatedDeliveryDate}}", emailData.estimatedDeliveryDate)
         .replace("{{additionalDetails}}", "")
+        .replace("{{productRows}}", productRows)
         .replace(
           "{{closingMessage}}",
           "We'll notify you once your order ships. If you have any questions, feel free to contact us."
         )
-        .replace("{{actionUrl}}", `https://www.gauraaj.com/order-confirmation/${emailData.orderId}`)
+        .replace(
+          "{{actionUrl}}",
+          `https://www.gauraaj.com/order-confirmation/${emailData.orderId}`
+        )
         .replace("{{actionText}}", "View Your Order")
         .replace("{{companyName}}", emailData.companyName)
         .replace("{{companyWebsite}}", emailData.companyWebsite)
         .replace("{{supportEmail}}", emailData.supportEmail)
         .replace("{{whatsAppNumber}}", emailData.whatsAppNumber)
-        .replace("{{whatsAppUrl}}", emailData.whatsAppUrl);
+        .replace("{{whatsAppUrl}}", emailData.whatsAppUrl)
+        .replace("{{unsubscribeUrl}}", emailData.unsubscribeUrl);
 
       await sendEmail(
         order.userDetails?.email || "",
         "Order Confirmed",
-        customerEmailBody
+        customerEmailBody,
+        {
+          from: '"Gauraaj" <no-reply@gauraaj.com>',
+          headers: {
+            "List-Unsubscribe": `<${emailData.unsubscribeUrl}>`,
+            "X-PM-Message-Stream": "transactional",
+          },
+        }
       );
     } catch (emailError) {
       console.error("Failed to send customer confirmation email:", {
-        error: emailError instanceof Error ? emailError.message : "Unknown error",
+        error:
+          emailError instanceof Error ? emailError.message : "Unknown error",
         stack: emailError instanceof Error ? emailError.stack : "Unknown stack",
         orderId,
       });
@@ -418,28 +515,43 @@ const verifyPayment = async (req: Request, res: Response) => {
           `<tr><th>Customer Name</th><td>${
             order.userDetails?.name || "N/A"
           }</td></tr>
-           <tr><th>Customer Phone</th><td><a href="https://wa.me/${order.userDetails?.phone || ""}">${order.userDetails?.phone || "N/A"}</a></td></tr>`
+           <tr><th>Customer Phone</th><td><a href="https://wa.me/${
+             order.userDetails?.phone || ""
+           }">${order.userDetails?.phone || "N/A"}</a></td></tr>`
         )
+        .replace("{{productRows}}", productRows)
         .replace(
           "{{closingMessage}}",
           "Please ensure the order is processed and shipped on time. Contact support if you encounter any issues."
         )
-        .replace("{{actionUrl}}", `https://gauraaj-admin.vercel.app/admin/orders/${emailData.orderId}`)
+        .replace(
+          "{{actionUrl}}",
+          `https://gauraaj-admin.vercel.app/admin/orders/${emailData.orderId}`
+        )
         .replace("{{actionText}}", "View Order in Dashboard")
         .replace("{{companyName}}", emailData.companyName)
         .replace("{{companyWebsite}}", emailData.companyWebsite)
         .replace("{{supportEmail}}", emailData.supportEmail)
         .replace("{{whatsAppNumber}}", emailData.whatsAppNumber)
-        .replace("{{whatsAppUrl}}", emailData.whatsAppUrl);
+        .replace("{{whatsAppUrl}}", emailData.whatsAppUrl)
+        .replace("{{unsubscribeUrl}}", emailData.unsubscribeUrl);
 
       await sendEmail(
-        "ghccustomercare@gmail.com", // Replace with actual shop owner email
+        "ghccustomercare@gmail.com",
         "New Order Received",
-        shopOwnerEmailBody
+        shopOwnerEmailBody,
+        {
+          from: '"Gauraaj" <no-reply@gauraaj.com>',
+          headers: {
+            "List-Unsubscribe": `<${emailData.unsubscribeUrl}>`,
+            "X-PM-Message-Stream": "transactional",
+          },
+        }
       );
     } catch (emailError) {
       console.error("Failed to send shop owner notification email:", {
-        error: emailError instanceof Error ? emailError.message : "Unknown error",
+        error:
+          emailError instanceof Error ? emailError.message : "Unknown error",
         stack: emailError instanceof Error ? emailError.stack : "Unknown stack",
         orderId,
       });
@@ -465,7 +577,6 @@ const verifyPayment = async (req: Request, res: Response) => {
     );
   }
 };
-
 // Fetch Payment Details by ID
 const getPaymentDetailsById = async (req: Request, res: Response) => {
   try {
