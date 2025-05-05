@@ -2,6 +2,7 @@ import axios from "axios";
 import mongoose from "mongoose";
 import { sendMessageToKafka } from "../config/kafkaConfig";
 import shipRocketConfig from "../config/shipRocketConfig";
+import productModel from "../models/Product.model";
 
 interface ShipRocketOrderRequest {
   orderId: string;
@@ -83,9 +84,11 @@ const createShipRocketOrder = async (data: {
   addressSnapshot: any;
   totalAmount: number;
   paymentMethod: number;
-  courierName: string; // Added courierName to input
+  courierName: string;
 }) => {
   try {
+    console.log("products", data.products);
+
     // Validate required fields
     if (!data.products?.length) {
       throw new Error("No products provided for Shiprocket order");
@@ -109,12 +112,44 @@ const createShipRocketOrder = async (data: {
 
     const token = await getShipRocketToken();
 
-    // Construct payload according to Shiprocket's requirements
+    // Fetch SKUs for products if missing in skuParameters
+    const orderItems = await Promise.all(
+      data.products.map(async (item) => {
+        let sku = item.skuParameters?.sku;
+        if (!sku) {
+          // Fetch product to get SKU
+          const product = await productModel.findById(item.productId);
+          if (product) {
+            const variant = product.variants.find(
+              (v: any) => v._id.toString() === item.variantId
+            );
+            sku = variant?.sku || item.productId.toString(); // Fallback to productId if variant SKU is missing
+          } else {
+            sku = item.productId.toString(); // Fallback if product not found
+          }
+        }
+
+        if (!item.name || !item.quantity || !item.price) {
+          throw new Error(`Invalid product data: ${JSON.stringify(item)}`);
+        }
+
+        return {
+          name: item.name,
+          sku,
+          units: parseInt(item.quantity.toString(), 10),
+          selling_price: parseFloat(item.price.toString()),
+          discount: parseFloat(item.discount?.toString() || "0"),
+          tax: parseFloat(item.tax?.toString() || "0"),
+          hsn: item.hsn || "",
+        };
+      })
+    );
+
     const payload = {
       order_id: data.orderId,
       order_date: new Date().toISOString(),
       pickup_location: process.env.SHIPROCKET_PICKUP_LOCATION || "Primary",
-      channel_id: "", // Optional, set if using a specific channel
+      channel_id: "",
       comment: "Order from Gauraaj",
       billing_customer_name:
         data.addressSnapshot.name?.split(" ")[0] || "Customer",
@@ -129,22 +164,9 @@ const createShipRocketOrder = async (data: {
       billing_email: data.addressSnapshot.email || "customer@example.com",
       billing_phone: data.addressSnapshot.phone || "9876543210",
       shipping_is_billing: true,
-      order_items: data.products.map((item) => {
-        if (!item.name || !item.quantity || !item.price) {
-          throw new Error(`Invalid product data: ${JSON.stringify(item)}`);
-        }
-        return {
-          name: item.name,
-          sku: item.skuParameters?.sku || item.productId.toString(),
-          units: parseInt(item.quantity.toString(), 10),
-          selling_price: parseFloat(item.price.toString()),
-          discount: parseFloat(item.discount?.toString() || "0"),
-          tax: parseFloat(item.tax?.toString() || "0"),
-          hsn: item.hsn || "",
-        };
-      }),
+      order_items: orderItems,
       payment_method: data.paymentMethod === 1 ? "COD" : "Prepaid",
-      shipping_charges: 0, // Will be updated post-courier assignment
+      shipping_charges: 0,
       giftwrap_charges: 0,
       transaction_charges: 0,
       total_discount: data.products.reduce(
@@ -196,10 +218,9 @@ const createShipRocketOrder = async (data: {
         ),
         0.5
       ),
-      courier_name: data.courierName.toLowerCase(), // Normalize to lowercase for Shiprocket
+      courier_name: data.courierName.toLowerCase(),
     };
 
-    // Log payload for debugging
     console.debug(
       "Shiprocket create order payload:",
       JSON.stringify(payload, null, 2)
@@ -215,10 +236,6 @@ const createShipRocketOrder = async (data: {
         },
       }
     );
-
-    if (!response.data?.order_id) {
-      throw new Error("Shiprocket response missing order_id");
-    }
 
     return response.data;
   } catch (error: any) {

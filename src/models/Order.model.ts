@@ -96,8 +96,11 @@ const OrderSchema: Schema<Order> = new Schema(
           required: true,
         },
         skuParameters: {
-          type: Map,
-          of: Schema.Types.Mixed,
+          sku: { type: String, required: true },
+          weight: { type: String, required: true },
+          length: { type: String },
+          breadth: { type: String },
+          height: { type: String },
         },
       },
     ],

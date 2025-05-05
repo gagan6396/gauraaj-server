@@ -246,7 +246,7 @@ const calculateShippingCharges = async (req: any, res: Response) => {
     const token = await getShipRocketToken();
 
     // Configurable pickup postcode (from environment or default)
-    const pickupPostcode = process.env.SHIPROCKET_PICKUP_POSTCODE || "110001";
+    const pickupPostcode = process.env.SHIPROCKET_PICKUP_POSTCODE || "248001";
 
     // Make API request to Shiprocket
     const response = await axios.get(
@@ -455,7 +455,7 @@ const createOrder = async (req: any, res: Response) => {
     });
   } catch (error: any) {
     console.log("Error creating order:", error);
-    
+
     console.error("Order creation failed:", {
       message: error.message,
       stack: error.stack,
@@ -515,7 +515,13 @@ const processProducts = async (products: any[]) => {
       quantity,
       price,
       name: `${product.name} - ${variant.name}`,
-      skuParameters: { weight: variant.weight.toString() },
+      skuParameters: {
+        weight: variant.weight.toString(), // Already included
+        sku: variant.sku, // Add SKU from variant
+        length: variant.dimensions.length.toString(), // Optional
+        breadth: variant.dimensions.width.toString(), // Optional
+        height: variant.dimensions.height.toString(), // Optional
+      },
     });
 
     variant.stock -= quantity;
@@ -571,7 +577,7 @@ const calculateShippingChargesForOrder = async (
     const token = await getShipRocketToken();
 
     // Configurable pickup postcode
-    const pickupPostcode = process.env.SHIPROCKET_PICKUP_POSTCODE || "110001";
+    const pickupPostcode = process.env.SHIPROCKET_PICKUP_POSTCODE || "248001";
 
     // Make API request to Shiprocket
     const response = await axios.get(
