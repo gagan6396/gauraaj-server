@@ -85,10 +85,9 @@ export const updatePublicReview = async (req: Request, res: Response) => {
     }
 
     review.comment = comment || review.comment;
-    review.profile =
-      req.body.imageUrls[0] !== undefined
-        ? req.body.imageUrls[0]
-        : review.profile;
+    if (req?.body?.imageUrls && req?.body?.imageUrls?.length > 0) {
+      review.profile = req.body.imageUrl ?? req.body.imageUrls[0];
+    }
 
     const updatedReview = await review.save();
     return apiResponse(
