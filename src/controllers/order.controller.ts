@@ -2,11 +2,10 @@ import axios, { AxiosError } from "axios";
 import { Request, Response } from "express";
 import mongoose from "mongoose";
 import Razorpay from "razorpay";
-import { sendMessageToKafka } from "../config/kafkaConfig";
 import shipRocketConfig from "../config/shipRocketConfig";
 import CartModel from "../models/Cart.model";
-import orderModel from "../models/Order.model";
-import PaymentModel from "../models/Payment.model";
+import orderModel, { Order } from "../models/Order.model";
+import PaymentModel, { Payment } from "../models/Payment.model";
 import productModel from "../models/Product.model";
 import profileModel from "../models/Profile.model";
 import ShippingModel from "../models/Shipping.model";
@@ -18,6 +17,49 @@ import {
 } from "../services/shipRocket.service";
 import apiResponse from "../utils/ApiResponse";
 import { sendEmail } from "../utils/EmailHelper";
+const emailTemplate = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 20px auto; background: #fff; padding: 20px; border-radius: 8px; }
+    .header { background: #007bff; color: #fff; padding: 15px; text-align: center; border-radius: 8px 8px 0 0; }
+    .content { padding: 20px; }
+    .footer { text-align: center; padding: 10px; color: #666; font-size: 12px; }
+    .button { display: inline-block; padding: 10px 20px; background: #007bff; color: #fff; text-decoration: none; border-radius: 5px; }
+    table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background: #f8f8f8; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>{{emailTitle}}</h1>
+    </div>
+    <div class="content">
+      <h2>{{greeting}}</h2>
+      <p>{{mainMessage}}</p>
+      <table>
+        <tr><th>Order ID</th><td>{{orderId}}</td></tr>
+        <tr><th>Order Date</th><td>{{orderDate}}</td></tr>
+        <tr><th>Status</th><td>{{status}}</td></tr>
+        {{additionalDetails}}
+      </table>
+      <p>{{closingMessage}}</p>
+      <a href="{{actionUrl}}" class="button">{{actionText}}</a>
+    </div>
+    <div class="footer">
+      <p>Gauraaj | <a href="https://www.gauraaj.com">Visit our website</a></p>
+      <p>Contact: <a href="mailto:ghccustomercare@gmail.com">ghccustomercare@gmail.com</a></p>
+    </div>
+  </div>
+</body>
+</html>
+`;
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID as string,
@@ -649,11 +691,11 @@ const shipOrder = async (req: any, res: Response) => {
     const { orderId } = req.params;
     const userId = req?.user?.id;
 
-    if (!mongoose.Types.ObjectId.isValid(orderId)) {
-      return apiResponse(res, 400, false, "Invalid order ID.");
-    }
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return apiResponse(res, 400, false, "Invalid user ID.");
+    if (
+      !mongoose.Types.ObjectId.isValid(orderId) ||
+      !mongoose.Types.ObjectId.isValid(userId)
+    ) {
+      return apiResponse(res, 400, false, "Invalid order or user ID.");
     }
 
     const order = await orderModel
@@ -674,83 +716,47 @@ const shipOrder = async (req: any, res: Response) => {
       return apiResponse(res, 400, false, "Shipping record not found.");
     }
 
-    // Generate shipping label (hypothetical implementation)
-    const shippingLabel = await generateShippingLabel(order, shipping);
-    const trackingNumber = `TRK${order._id}${Date.now()}`; // Simplified tracking number
+    const token = await getShipRocketToken();
+    const shippingLabelResponse = await axios.post(
+      `${shipRocketConfig.baseUrl}/v1/external/courier/generate/label`,
+      { shipment_id: order.shipRocketOrderId },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const trackingNumber = `TRK${order._id}${Date.now()}`;
 
-    // Assign courier partner
-    const courierDetails = await assignCourier(order.shipRocketOrderId);
-    if (!courierDetails) {
-      return apiResponse(res, 400, false, "Failed to assign courier.");
-    }
+    const courierResponse = await axios.post(
+      `${shipRocketConfig.baseUrl}/v1/external/courier/assign/awb`,
+      { shipment_id: order.shipRocketOrderId },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const courierDetails = courierResponse.data.courier;
 
-    // Update shipping record
     shipping.trackingNumber = trackingNumber;
-    shipping.courierService = courierDetails.courierName;
+    shipping.courierService = courierDetails.courier_name;
     shipping.shippingStatus = "Shipped";
     shipping.shippedAt = new Date();
     await shipping.save();
 
-    // Update order status
     order.orderStatus = "Shipped";
     order.shippingStatus = "Shipped";
     await order.save();
 
-    // Send shipping confirmation
-    await sendShippingConfirmation(order, shipping, trackingNumber);
-
-    await sendMessageToKafka("order.shipped", {
-      event: "order_shipped",
-      orderId,
+    // Send shipped notification
+    await sendOrderNotification(order, "shipped", {
+      courier: courierDetails.courier_name,
       trackingNumber,
-      courier: courierDetails.courierName,
+      trackUrl: `https://www.gauraaj.com/track/${order._id}`,
     });
 
     return apiResponse(res, 200, true, "Order shipped successfully.", {
       orderId,
       trackingNumber,
-      courier: courierDetails.courierName,
+      courier: courierDetails.courier_name,
     });
   } catch (error) {
     console.error("Error shipping order:", error);
     return apiResponse(res, 500, false, "Error shipping order.");
   }
-};
-
-const generateShippingLabel = async (order: any, shipping: any) => {
-  // Hypothetical implementation
-  const token = await getShipRocketToken();
-  const response = await axios.post(
-    `${shipRocketConfig.baseUrl}/v1/external/courier/generate/label`,
-    { shipment_id: order.shipRocketOrderId },
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
-  return response.data.label_url;
-};
-
-const assignCourier = async (shipRocketOrderId: number) => {
-  const token = await getShipRocketToken();
-  const response = await axios.post(
-    `${shipRocketConfig.baseUrl}/v1/external/courier/assign/awb`,
-    { shipment_id: shipRocketOrderId },
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
-  return response.data.courier;
-};
-
-const sendShippingConfirmation = async (
-  order: any,
-  shipping: any,
-  trackingNumber: string
-) => {
-  const user = order.user_id;
-  const emailContent = `
-    Dear ${user.first_name},
-    Your order ${order._id} has been shipped via ${shipping.courierService}.
-    Track your order: ${trackingNumber}
-    Estimated Delivery: ${shipping.estimatedDeliveryDate}
-  `;
-  await sendEmail(user.email, "Order Shipped", emailContent);
 };
 
 // 5. Track Order
@@ -788,21 +794,168 @@ const trackOrder = async (req: Request, res: Response) => {
     }
 
     const trackingDetails = await shipRocketTrackOrder(shipmentId);
-    if (trackingDetails) {
-      return apiResponse(
-        res,
-        200,
-        true,
-        "Tracking details retrieved.",
-        trackingDetails
-      );
+    console.log("Tracking details retrieved:", trackingDetails);
+    if (!trackingDetails) {
+      return apiResponse(res, 404, false, "Tracking details not found.");
     }
 
-    return apiResponse(res, 404, false, "Tracking details not found.");
+    // Format tracking response
+    const formattedTracking = {
+      orderId,
+      status: order.orderStatus,
+      shippingStatus: order.shippingStatus,
+      trackingDetails: {
+        awbCode: trackingDetails.tracking_data?.shipment_track[0].awb_code,
+        courierName:
+          trackingDetails.tracking_data?.shipment_track[0].courier_name,
+        currentStatus:
+          trackingDetails.tracking_data?.shipment_track[0].current_status,
+        estimatedDelivery: trackingDetails?.tracking_data.shipment_track[0].edd,
+        trackUrl: trackingDetails?.tracking_data.track_url,
+        activities:
+          trackingDetails.tracking_data.shipment_track_activities || [],
+      },
+    };
+
+    // Send tracking update email if status changed
+    if (
+      trackingDetails.tracking_data.shipment_track[0].current_status !==
+      order.shippingStatus
+    ) {
+      const emailBody = emailTemplate
+        .replace("{{emailTitle}}", "Order Tracking Update")
+        .replace("{{greeting}}", `Dear ${order.userDetails.name}`)
+        .replace(
+          "{{mainMessage}}",
+          `Your order status has been updated to: ${formattedTracking.trackingDetails.currentStatus}`
+        )
+        .replace("{{orderId}}", orderId)
+        .replace("{{orderDate}}", order.orderDate.toLocaleDateString())
+        .replace("{{status}}", formattedTracking.trackingDetails.currentStatus)
+        .replace(
+          "{{additionalDetails}}",
+          `<tr><th>Tracking Number</th><td>${formattedTracking.trackingDetails.awbCode}</td></tr><tr><th>Courier</th><td>${formattedTracking.trackingDetails.courierName}</td></tr>`
+        )
+        .replace(
+          "{{closingMessage}}",
+          "Track your order for the latest updates."
+        )
+        .replace("{{actionUrl}}", formattedTracking.trackingDetails.trackUrl)
+        .replace("{{actionText}}", "Track Order");
+
+      await sendEmail(
+        order.userDetails.email,
+        "Order Status Updated",
+        emailBody
+      );
+
+      // Update order status based on tracking
+      order.shippingStatus = formattedTracking.trackingDetails.currentStatus;
+      if (formattedTracking.trackingDetails.currentStatus === "Delivered") {
+        order.orderStatus = "Delivered";
+      }
+      await order.save();
+    }
+
+    return apiResponse(
+      res,
+      200,
+      true,
+      "Tracking details retrieved.",
+      formattedTracking
+    );
   } catch (error) {
     console.error("Error tracking order:", error);
     return apiResponse(res, 500, false, "Error tracking order.");
   }
+};
+
+const sendOrderNotification = async (
+  order: any,
+  type: string,
+  additionalData: any = {}
+) => {
+  let emailBody: string;
+  const baseDetails = `
+    <tr><th>Order ID</th><td>${order._id}</td></tr>
+    <tr><th>Order Date</th><td>${order.orderDate.toLocaleDateString()}</td></tr>
+    <tr><th>Total Amount</th><td>₹${order.totalAmount.toFixed(2)}</td></tr>
+  `;
+
+  switch (type) {
+    case "confirmation":
+      emailBody = emailTemplate
+        .replace("{{emailTitle}}", "Order Confirmation")
+        .replace("{{greeting}}", `Dear ${order.userDetails.name}`)
+        .replace(
+          "{{mainMessage}}",
+          "Thank you for your order! Your order has been confirmed."
+        )
+        .replace("{{orderId}}", order._id)
+        .replace("{{orderDate}}", order.orderDate.toLocaleDateString())
+        .replace("{{status}}", order.orderStatus)
+        .replace("{{additionalDetails}}", baseDetails)
+        .replace(
+          "{{closingMessage}}",
+          "We’ll notify you when your order ships."
+        )
+        .replace("{{actionUrl}}", `https://www.gauraaj.com/orders/${order._id}`)
+        .replace("{{actionText}}", "View Order");
+      break;
+
+    case "shipped":
+      emailBody = emailTemplate
+        .replace("{{emailTitle}}", "Order Shipped")
+        .replace("{{greeting}}", `Dear ${order.userDetails.name}`)
+        .replace(
+          "{{mainMessage}}",
+          `Your order has been shipped via ${additionalData.courier}.`
+        )
+        .replace("{{orderId}}", order._id)
+        .replace("{{orderDate}}", order.orderDate.toLocaleDateString())
+        .replace("{{status}}", "Shipped")
+        .replace(
+          "{{additionalDetails}}",
+          `${baseDetails}<tr><th>Tracking Number</th><td>${additionalData.trackingNumber}</td></tr>`
+        )
+        .replace("{{closingMessage}}", "Track your order for updates.")
+        .replace(
+          "{{actionUrl}}",
+          additionalData.trackUrl ||
+            `https://www.gauraaj.com/orders/${order._id}`
+        )
+        .replace("{{actionText}}", "Track Order");
+      break;
+
+    case "delivered":
+      emailBody = emailTemplate
+        .replace("{{emailTitle}}", "Order Delivered")
+        .replace("{{greeting}}", `Dear ${order.userDetails.name}`)
+        .replace(
+          "{{mainMessage}}",
+          "Your order has been successfully delivered!"
+        )
+        .replace("{{orderId}}", order._id)
+        .replace("{{orderDate}}", order.orderDate.toLocaleDateString())
+        .replace("{{status}}", "Delivered")
+        .replace("{{additionalDetails}}", baseDetails)
+        .replace(
+          "{{closingMessage}}",
+          "We hope you love your purchase! Please share your feedback."
+        )
+        .replace("{{actionUrl}}", `https://www.gauraaj.com/review/${order._id}`)
+        .replace("{{actionText}}", "Write a Review");
+      break;
+
+    default:
+      return;
+  }
+
+  await sendEmail(
+    order.userDetails.email,
+    emailTemplate.match(/<h1>(.*?)<\/h1>/)?.[1] || "Order Update",
+    emailBody
+  );
 };
 
 // 6. Return Order
@@ -812,11 +965,11 @@ const returnOrder = async (req: any, res: Response) => {
     const userId = req?.user?.id;
     const { reason, products } = req.body;
 
-    if (!mongoose.Types.ObjectId.isValid(orderId)) {
-      return apiResponse(res, 400, false, "Invalid order ID.");
-    }
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return apiResponse(res, 400, false, "Invalid user ID.");
+    if (
+      !mongoose.Types.ObjectId.isValid(orderId) ||
+      !mongoose.Types.ObjectId.isValid(userId)
+    ) {
+      return apiResponse(res, 400, false, "Invalid order or user ID.");
     }
     if (!reason || !products?.length) {
       return apiResponse(res, 400, false, "Reason and products required.");
@@ -838,6 +991,7 @@ const returnOrder = async (req: any, res: Response) => {
       );
     }
 
+    // Validate products
     const invalidProducts: string[] = [];
     for (const item of products) {
       const orderProduct = order.products.find(
@@ -858,14 +1012,21 @@ const returnOrder = async (req: any, res: Response) => {
       );
     }
 
+    // Update stock
     for (const { productId, quantity } of products) {
       const productDetails = await productModel.findById(productId);
       if (productDetails) {
-        productDetails.stock += quantity;
-        await productDetails.save();
+        const variant = productDetails.variants.find((v: any) =>
+          v._id.equals(productId)
+        );
+        if (variant) {
+          variant.stock += quantity;
+          await productDetails.save();
+        }
       }
     }
 
+    // Update order
     order.orderStatus = "Return Requested";
     order.shippingStatus = "Returned";
     order.products = order.products.map((p: any) => {
@@ -877,14 +1038,16 @@ const returnOrder = async (req: any, res: Response) => {
       }
       return p;
     });
-
     const updatedOrder = await order.save();
+
+    // Update shipping
     const shipping = await ShippingModel.findOne({ orderId });
     if (shipping) {
       shipping.shippingStatus = "Returned";
       await shipping.save();
     }
 
+    // ShipRocket return
     const shipRocketOrderId = order.shipRocketOrderId;
     const details = await getOrderDetailsFromShipRocket(shipRocketOrderId);
     if (!details) {
@@ -930,9 +1093,47 @@ const returnOrder = async (req: any, res: Response) => {
       return apiResponse(res, 400, false, "ShipRocket API response error.");
     }
 
-    // Schedule return pickup
-    const returnLabel = await generateReturnLabel(order);
-    await scheduleReturnPickup(order, shipping);
+    // Generate return label and schedule pickup
+    const token = await getShipRocketToken();
+    const returnLabelResponse = await axios.post(
+      `${shipRocketConfig.baseUrl}/v1/external/courier/generate/return-label`,
+      { order_id: order.shipRocketOrderId },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const returnLabel = returnLabelResponse.data.label_url;
+
+    await axios.post(
+      `${shipRocketConfig.baseUrl}/v1/external/courier/schedule-pickup`,
+      {
+        order_id: order.shipRocketOrderId,
+        pickup_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    // Send return confirmation email
+    const emailBody = emailTemplate
+      .replace("{{emailTitle}}", "Return Request Confirmation")
+      .replace("{{greeting}}", `Dear ${order.userDetails.name}`)
+      .replace(
+        "{{mainMessage}}",
+        `Your return request for order ${orderId} has been received. Reason: ${reason}`
+      )
+      .replace("{{orderId}}", orderId)
+      .replace("{{orderDate}}", order.orderDate.toLocaleDateString())
+      .replace("{{status}}", "Return Requested")
+      .replace(
+        "{{additionalDetails}}",
+        `<tr><th>Reason</th><td>${reason}</td></tr><tr><th>Return Label</th><td><a href="${returnLabel}">Download</a></td></tr>`
+      )
+      .replace(
+        "{{closingMessage}}",
+        "We’ll process your return soon. Track the status in your account."
+      )
+      .replace("{{actionUrl}}", `https://www.gauraaj.com/orders/${orderId}`)
+      .replace("{{actionText}}", "Track Return");
+
+    await sendEmail(order.userDetails.email, "Return Requested", emailBody);
 
     return apiResponse(res, 200, true, "Return requested successfully.", {
       updatedOrder,
@@ -945,53 +1146,42 @@ const returnOrder = async (req: any, res: Response) => {
   }
 };
 
-const generateReturnLabel = async (order: any) => {
-  const token = await getShipRocketToken();
-  const response = await axios.post(
-    `${shipRocketConfig.baseUrl}/v1/external/courier/generate/return-label`,
-    { order_id: order.shipRocketOrderId },
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
-  return response.data.label_url;
-};
-
-const scheduleReturnPickup = async (order: any, shipping: any) => {
-  const token = await getShipRocketToken();
-  await axios.post(
-    `${shipRocketConfig.baseUrl}/v1/external/courier/schedule-pickup`,
-    {
-      order_id: order.shipRocketOrderId,
-      pickup_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-    },
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
-};
-
-// 7. Cancel Order
+// Updated cancelOrder function
 const cancelOrder = async (req: any, res: Response) => {
   try {
     const { orderId } = req.params;
     const userId = req?.user?.id;
+    const { reason = "Not specified" } = req.body; // Default reason if undefined
 
-    if (!mongoose.Types.ObjectId.isValid(orderId)) {
-      return apiResponse(res, 400, false, "Invalid order ID.");
-    }
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return apiResponse(res, 400, false, "Invalid user ID.");
+    console.log("Cancelling order:", orderId, "for user:", userId);
+    console.log("Cancellation reason:", reason);
+
+    // Validate IDs
+    if (
+      !mongoose.Types.ObjectId.isValid(orderId) ||
+      !mongoose.Types.ObjectId.isValid(userId)
+    ) {
+      return apiResponse(res, 400, false, "Invalid order or user ID.");
     }
 
-    const order = await orderModel.findById(orderId).populate("payment_id");
+    // Fetch order with populated payment_id
+    const order = await orderModel
+      .findById(orderId)
+      .populate<{ payment_id: Payment }>("payment_id");
     if (!order) {
       return apiResponse(res, 404, false, "Order not found.");
     }
+
+    // Authorization check
     if (order.user_id.toString() !== userId) {
       return apiResponse(res, 403, false, "Unauthorized access.");
     }
+
+    // Check order status
     if (order.orderStatus === "Cancelled") {
       return apiResponse(res, 400, false, "Order already cancelled.");
     }
-
-    if (order.orderStatus === "Shipped" || order.orderStatus === "Delivered") {
+    if (["Shipped", "Delivered"].includes(order.orderStatus)) {
       return apiResponse(
         res,
         400,
@@ -1000,22 +1190,26 @@ const cancelOrder = async (req: any, res: Response) => {
       );
     }
 
+    // Update order status
     order.orderStatus = "Cancelled";
     order.shippingStatus = "Cancelled";
     await order.save();
 
+    // Update shipping record
     const shipping = await ShippingModel.findOne({ orderId });
     if (shipping) {
       shipping.shippingStatus = "Cancelled";
       await shipping.save();
     }
 
+    // Process refund if payment completed
     if (order.payment_id && order.payment_id.status === "Completed") {
-      await initiateRefund(order);
+      await initiateRefund(order, reason);
     }
 
+    // Cancel ShipRocket order
     if (order.shipRocketOrderId) {
-      await cancelShipRocketOrder(orderId, order.shipRocketOrderId);
+      await cancelShipRocketOrder(orderId, parseInt(order.shipRocketOrderId));
     }
 
     // Restore stock
@@ -1032,35 +1226,92 @@ const cancelOrder = async (req: any, res: Response) => {
       }
     }
 
+    // Send cancellation email
+    const emailBody = emailTemplate
+      .replace("{{emailTitle}}", "Order Cancellation")
+      .replace("{{greeting}}", `Dear ${order.userDetails.name}`)
+      .replace(
+        "{{mainMessage}}",
+        `Your order has been successfully cancelled. Reason: ${reason}`
+      )
+      .replace("{{orderId}}", orderId)
+      .replace("{{orderDate}}", order.orderDate.toLocaleDateString())
+      .replace("{{status}}", "Cancelled")
+      .replace(
+        "{{additionalDetails}}",
+        `<tr><th>Reason</th><td>${reason}</td></tr>`
+      )
+      .replace(
+        "{{closingMessage}}",
+        "We’re sorry to see you cancel. Contact us if you need assistance."
+      )
+      .replace("{{actionUrl}}", "https://www.gauraaj.com/orders")
+      .replace("{{actionText}}", "View Orders");
+
+    await sendEmail(order.userDetails.email, "Order Cancelled", emailBody);
+
     return apiResponse(res, 200, true, "Order cancelled successfully.");
-  } catch (error) {
-    console.error("Error cancelling order:", error);
+  } catch (error: any) {
+    console.error("Error cancelling order:", {
+      error: error.message,
+      stack: error.stack,
+    });
     return apiResponse(res, 500, false, "Error cancelling order.");
   }
 };
 
-const initiateRefund = async (order: any) => {
-  if (order.payment_id.paymentMethod === "Razorpay") {
-    const refund = await razorpay.payments.refund(
-      order.payment_id.transactionId,
-      {
-        amount: order.totalAmount * 100,
+// Updated initiateRefund function
+const initiateRefund = async (order: Order, reason: string): Promise<void> => {
+  try {
+    const payment = order.payment_id as unknown as Payment;
+    if (!payment || !payment.transactionId) {
+      throw new Error("Payment details not found for this order.");
+    }
+
+    if (payment.paymentMethod === "Razorpay") {
+      try {
+        const refund = await razorpay.payments.refund(payment.transactionId, {
+          amount: Math.round(order.totalAmount * 100), // Convert to paise
+          notes: { reason: reason || "Order cancellation" },
+        });
+
+        await PaymentModel.findByIdAndUpdate(payment._id, {
+          status: "Refunded",
+          refundDetails: {
+            refundId: refund.id,
+            amount: order.totalAmount,
+            reason: reason || "Order cancellation",
+            refundedAt: new Date(),
+          },
+        });
+      } catch (razorpayError: any) {
+        console.error("Razorpay refund failed:", {
+          transactionId: payment.transactionId,
+          error: razorpayError.message || "Unknown error",
+          details: razorpayError,
+        });
+        throw new Error(
+          `Razorpay refund failed: ${razorpayError.message || "Unknown error"}`
+        );
       }
-    );
-    await PaymentModel.findByIdAndUpdate(order.payment_id._id, {
-      status: "Refunded",
-      refundDetails: {
-        refundId: refund.id,
-        amount: order.totalAmount,
-        refundedAt: new Date(),
-      },
+    } else if (payment.paymentMethod === "COD") {
+      await PaymentModel.findByIdAndUpdate(payment._id, {
+        status: "Refunded",
+        refundDetails: {
+          amount: order.totalAmount,
+          reason: reason || "Order cancellation",
+          refundedAt: new Date(),
+        },
+      });
+    } else {
+      throw new Error(`Unsupported payment method: ${payment.paymentMethod}`);
+    }
+  } catch (error: any) {
+    console.error("Refund initiation failed:", {
+      orderId: order._id,
+      error: error.message,
     });
-  } else if (order.payment_id.paymentMethod === "COD") {
-    // Handle COD refund (e.g., via bank transfer or wallet)
-    await PaymentModel.findByIdAndUpdate(order.payment_id._id, {
-      status: "Refunded",
-      refundDetails: { amount: order.totalAmount, refundedAt: new Date() },
-    });
+    throw error;
   }
 };
 
@@ -1403,6 +1654,7 @@ export {
   getShippingAnalytics,
   postOrderActions,
   returnOrder,
+  sendOrderNotification,
   shipOrder,
   trackOrder
 };

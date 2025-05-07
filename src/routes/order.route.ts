@@ -21,7 +21,7 @@ orderRoute.post("/", authMiddleware, createOrder); // Create a new order
 orderRoute.get("/:orderId", authMiddleware, getOrderById); // Get order details by ID
 orderRoute.post("/:orderId/cancel", authMiddleware, cancelOrder); // Cancel an order
 orderRoute.post("/:orderId/return", authMiddleware, returnOrder); // Request a return
-orderRoute.post("/:orderId/exchange", authMiddleware, exchangeOrder); // Request an exchange
+orderRoute.post("/:orderId/exchange", authMiddleware, exchangeOrder); // Request an exchange unaware of any additional routes for notifications
 orderRoute.get("/track/:orderId", authMiddleware, trackOrder); // Track an order
 orderRoute.post("/cart/add/:productId/:variantId", authMiddleware, addProductToCart); // Add product to cart
 orderRoute.post("/calculate-shipping", authMiddleware, calculateShippingCharges); // Calculate shipping charges

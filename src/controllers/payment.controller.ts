@@ -17,6 +17,58 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET as string,
 });
 
+
+// Email template for cancellation and order confirmation
+const emailTemplate = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{emailTitle}}</title>
+  <style>
+    body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 20px auto; background: #fff; padding: 20px; border-radius: 8px; }
+    .header { text-align: center; padding: 10px; background: #007bff; color: #fff; border-radius: 8px 8px 0 0; }
+    .content { padding: 20px; }
+    .content p { color: #333; }
+    .order-details, .product-details { width: 100%; border-collapse: collapse; margin: 10px 0; }
+    .order-details th, .order-details td, .product-details th, .product-details td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    .order-details th, .product-details th { background: #f8f8f8; }
+    .footer { text-align: center; padding: 10px; color: #666; font-size: 12px; }
+    .button { display: inline-block; padding: 10px 20px; background: #007bff; color: #fff; text-decoration: none; border-radius: 5px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header"><h2>{{emailTitle}}</h2></div>
+    <div class="content">
+      <p>{{greeting}}</p>
+      <p>{{mainMessage}}</p>
+      <table class="order-details">
+        <tr><th>Order ID</th><td>{{orderId}}</td></tr>
+        <tr><th>Order Date</th><td>{{orderDate}}</td></tr>
+        <tr><th>Total Amount</th><td>{{totalAmount}}</td></tr>
+        <tr><th>Payment Method</th><td>{{paymentMethod}}</td></tr>
+        <tr><th>Shipping Address</th><td>{{shippingAddress}}</td></tr>
+        <tr><th>Estimated Delivery</th><td>{{estimatedDeliveryDate}}</td></tr>
+        {{additionalDetails}}
+      </table>
+      {{productTable}}
+      <p>{{closingMessage}}</p>
+      <a href="{{actionUrl}}" class="button">{{actionText}}</a>
+      <p>Contact us on WhatsApp: <a href="{{whatsAppUrl}}">{{whatsAppNumber}}</a></p>
+    </div>
+    <div class="footer">
+      <p>Gauraaj | <a href="{{companyWebsite}}">Visit our website</a></p>
+      <p>Contact us at <a href="mailto:{{supportEmail}}">{{supportEmail}}</a></p>
+      <p><a href="{{unsubscribeUrl}}">Unsubscribe</a></p>
+    </div>
+  </div>
+</body>
+</html>
+`;
+
 const createOrder = async (req: Request, res: Response) => {
   try {
     const { userId, orderId, paymentMethod, amount } = req.body;
@@ -63,9 +115,17 @@ const createOrder = async (req: Request, res: Response) => {
 };
 
 // Verify Razorpay Payment
-const verifyPayment = async (req: Request, res: Response) => {
+// Full updated verifyPayment function
+const verifyPayment = async (req: any, res: Response) => {
   try {
-    const { orderId, addressSnapshot, paymentMethod } = req.body;
+    const {
+      orderId,
+      addressSnapshot,
+      paymentMethod,
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+    } = req.body;
 
     // Validate inputs
     if (!mongoose.Types.ObjectId.isValid(orderId)) {
@@ -106,14 +166,12 @@ const verifyPayment = async (req: Request, res: Response) => {
 
     // Verify payment signature for Razorpay
     if (paymentMethod === 0) {
-      const { razorpay_order_id, razorpay_payment_id, razorpay_signature } =
-        req.body;
       if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
         return apiResponse(
           res,
           400,
           false,
-          "Missing payment verification details"
+          "Missing Razorpay payment verification details"
         );
       }
 
@@ -123,28 +181,54 @@ const verifyPayment = async (req: Request, res: Response) => {
         .digest("hex");
 
       if (generatedSignature !== razorpay_signature) {
-        return apiResponse(res, 400, false, "Invalid payment signature");
+        return apiResponse(
+          res,
+          400,
+          false,
+          "Invalid Razorpay payment signature"
+        );
+      }
+
+      // Validate Razorpay payment_id format
+      if (!razorpay_payment_id.startsWith("pay_")) {
+        return apiResponse(
+          res,
+          400,
+          false,
+          "Invalid Razorpay payment ID format"
+        );
       }
     }
 
-    // Update payment status
-    const payment = await PaymentModel.findOneAndUpdate(
-      {
-        transactionId:
-          paymentMethod === 0 ? req.body.razorpay_order_id : `COD_${orderId}`,
-        orderId,
-      },
-      { status: "Completed", updatedAt: new Date() },
-      { new: true }
-    );
+    // Update or create payment record
+    const transactionId =
+      paymentMethod === 0 ? razorpay_payment_id! : `COD_${orderId}`;
+    let payment = await PaymentModel.findOne({ orderId, transactionId });
+
     if (!payment) {
-      return apiResponse(res, 404, false, "Payment record not found");
+      payment = new PaymentModel({
+        userId: order.user_id,
+        orderId,
+        paymentMethod: paymentMethod === 0 ? "Razorpay" : "COD",
+        transactionId,
+        amount: order.totalAmount,
+        status: "Completed",
+      });
+    } else {
+      payment.status = "Completed";
+      payment.updatedAt = new Date();
     }
+
+    await payment.save();
 
     // Update order status
     const updatedOrder = await orderModel.findByIdAndUpdate(
       orderId,
-      { orderStatus: "Confirmed", shippingStatus: "Pending" },
+      {
+        orderStatus: "Confirmed",
+        shippingStatus: "Pending",
+        payment_id: payment._id,
+      },
       { new: true }
     );
     if (!updatedOrder) {
@@ -171,6 +255,7 @@ const verifyPayment = async (req: Request, res: Response) => {
     updatedOrder.shippingAddressId = savedShipping._id;
 
     // Create ShipRocket order
+    let shipRocketOrderId: string | undefined;
     try {
       const shipRocketResponse = await createShipRocketOrder({
         orderId: orderId.toString(),
@@ -180,7 +265,8 @@ const verifyPayment = async (req: Request, res: Response) => {
         paymentMethod: order.paymentMethod,
         courierName: order.courierService || "Default Courier",
       });
-      updatedOrder.shipRocketOrderId = shipRocketResponse.order_id;
+      shipRocketOrderId = shipRocketResponse.order_id;
+      updatedOrder.shipRocketOrderId = shipRocketOrderId;
     } catch (shipRocketError: any) {
       console.error("ShipRocket integration failed:", {
         orderId,
@@ -205,179 +291,7 @@ const verifyPayment = async (req: Request, res: Response) => {
 
     await updatedOrder.save();
 
-    // Embedded email template
-    const emailTemplate = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <title>Order Confirmation</title>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      background-color: #f4f4f4;
-      margin: 0;
-      padding: 0;
-      line-height: 1.6;
-    }
-    .container {
-      max-width: 600px;
-      margin: 20px auto;
-      background-color: #ffffff;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-    .header {
-      text-align: center;
-      padding: 20px;
-      background-color: #007bff;
-      color: #ffffff;
-      border-radius: 8px 8px 0 0;
-    }
-    .header h1 {
-      margin: 0;
-      font-size: 24px;
-      font-weight: 600;
-    }
-    .content {
-      padding: 20px;
-    }
-    .content h2 {
-      color: #333333;
-      font-size: 20px;
-      margin-top: 0;
-      font-weight: 500;
-    }
-    .content p {
-      color: #4a4a4a;
-      margin: 10px 0;
-    }
-    .order-details, .product-details {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 20px 0;
-    }
-    .order-details th,
-    .order-details td,
-    .product-details th,
-    .product-details td {
-      border: 1px solid #e0e0e0;
-      padding: 12px;
-      text-align: left;
-    }
-    .order-details th,
-    .product-details th {
-      background-color: #f8f8f8;
-      color: #333333;
-      font-weight: 600;
-    }
-    .footer {
-      text-align: center;
-      padding: 20px;
-      color: #6b7280;
-      font-size: 12px;
-      border-top: 1px solid #e0e0e0;
-    }
-    .footer a {
-      color: #007bff;
-      text-decoration: none;
-    }
-    .button {
-      display: inline-block;
-      padding: 12px 24px;
-      margin: 10px 0;
-      background-color: #007bff;
-      color: #ffffff;
-      text-decoration: none;
-      border-radius: 5px;
-      font-weight: 500;
-    }
-    .button:hover {
-      background-color: #0056b3;
-    }
-    @media only screen and (max-width: 600px) {
-      .container {
-        width: 100%;
-        margin: 10px;
-        padding: 10px;
-      }
-      .header h1 {
-        font-size: 20px;
-      }
-      .content h2 {
-        font-size: 18px;
-      }
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>{{emailTitle}}</h1>
-    </div>
-    <div class="content">
-      <h2>{{greeting}}</h2>
-      <p>{{mainMessage}}</p>
-      <h3>Order Details</h3>
-      <table class="order-details">
-        <tr>
-          <th>Order ID</th>
-          <td>{{orderId}}</td>
-        </tr>
-        <tr>
-          <th>Order Date</th>
-          <td>{{orderDate}}</td>
-        </tr>
-        <tr>
-          <th>Total Amount</th>
-          <td>{{totalAmount}}</td>
-        </tr>
-        <tr>
-          <th>Payment Method</th>
-          <td>{{paymentMethod}}</td>
-        </tr>
-        <tr>
-          <th>Shipping Address</th>
-          <td>{{shippingAddress}}</td>
-        </tr>
-        <tr>
-          <th>Estimated Delivery</th>
-          <td>{{estimatedDeliveryDate}}</td>
-        </tr>
-        {{additionalDetails}}
-      </table>
-      <h3>Products</h3>
-      <table class="product-details">
-        <tr>
-          <th>Product</th>
-          <th>Variant</th>
-          <th>SKU</th>
-          <th>Quantity</th>
-          <th>Price</th>
-          <th>Discount</th>
-          <th>Total</th>
-        </tr>
-        {{productRows}}
-      </table>
-      <p>{{closingMessage}}</p>
-      <a href="{{actionUrl}}" class="button">{{actionText}}</a>
-      <p>Contact us on WhatsApp: <a href="{{whatsAppUrl}}">{{whatsAppNumber}}</a></p>
-    </div>
-    <div class="footer">
-      <p>Thank you for choosing us!</p>
-      <p>{{companyName}} | <a href="{{companyWebsite}}">Visit our website</a></p>
-      <p>Contact us at <a href="mailto:{{supportEmail}}">{{supportEmail}}</a></p>
-      <p style="margin-top: 10px;">If you no longer wish to receive these emails, <a href="{{unsubscribeUrl}}">unsubscribe here</a>.</p>
-    </div>
-  </div>
-</body>
-</html>
-`;
-
-    // Prepare common email data
+    // Prepare email data
     const emailData = {
       orderId: orderId.toString(),
       orderDate: new Date().toLocaleDateString(),
@@ -392,12 +306,12 @@ const verifyPayment = async (req: Request, res: Response) => {
       supportEmail: "ghccustomercare@gmail.com",
       whatsAppNumber: "+91-6397-90-4655",
       whatsAppUrl: "https://wa.me/+916397904655",
-      unsubscribeUrl: `https://www.gauraaj.com?email=${encodeURIComponent(
+      unsubscribeUrl: `https://www.gauraaj.com/unsubscribe?email=${encodeURIComponent(
         order.userDetails?.email || ""
       )}`,
     };
 
-    // Fetch product details and generate product rows
+    // Generate product rows for email
     const productRows = await Promise.all(
       order.products.map(async (orderProduct: any) => {
         const product = await productModel.findById(orderProduct.productId);
@@ -436,7 +350,22 @@ const verifyPayment = async (req: Request, res: Response) => {
             <td>₹${total}</td>
           </tr>`;
       })
-    ).then(rows => rows.join(""));
+    ).then((rows) => rows.join(""));
+
+    const productTable = `
+      <h3>Products</h3>
+      <table class="product-details">
+        <tr>
+          <th>Product</th>
+          <th>Variant</th>
+          <th>SKU</th>
+          <th>Quantity</th>
+          <th>Price</th>
+          <th>Discount</th>
+          <th>Total</th>
+        </tr>
+        ${productRows}
+      </table>`;
 
     // Send email to customer
     try {
@@ -457,7 +386,7 @@ const verifyPayment = async (req: Request, res: Response) => {
         .replace("{{shippingAddress}}", emailData.shippingAddress)
         .replace("{{estimatedDeliveryDate}}", emailData.estimatedDeliveryDate)
         .replace("{{additionalDetails}}", "")
-        .replace("{{productRows}}", productRows)
+        .replace("{{productTable}}", productTable)
         .replace(
           "{{closingMessage}}",
           "We'll notify you once your order ships. If you have any questions, feel free to contact us."
@@ -519,7 +448,7 @@ const verifyPayment = async (req: Request, res: Response) => {
              order.userDetails?.phone || ""
            }">${order.userDetails?.phone || "N/A"}</a></td></tr>`
         )
-        .replace("{{productRows}}", productRows)
+        .replace("{{productTable}}", productTable)
         .replace(
           "{{closingMessage}}",
           "Please ensure the order is processed and shipped on time. Contact support if you encounter any issues."
@@ -577,6 +506,7 @@ const verifyPayment = async (req: Request, res: Response) => {
     );
   }
 };
+
 // Fetch Payment Details by ID
 const getPaymentDetailsById = async (req: Request, res: Response) => {
   try {
