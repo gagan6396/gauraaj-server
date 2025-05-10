@@ -1226,8 +1226,68 @@ const cancelOrder = async (req: any, res: Response) => {
       }
     }
 
-    // Send cancellation email
-    const emailBody = emailTemplate
+    // Generate product rows for email
+    const productRows = await Promise.all(
+      order.products.map(async (orderProduct: any) => {
+        const product = await productModel.findById(orderProduct.productId);
+        let variant = null;
+        let discountDisplay = "N/A";
+
+        if (product) {
+          variant = product.variants.find(
+            (v: any) => v._id.toString() === orderProduct.variantId
+          );
+          if (variant && variant.discount?.active) {
+            const discountValue = variant.discount.value;
+            if (variant.discount.type === "percentage") {
+              discountDisplay = `${discountValue}%`;
+            } else if (variant.discount.type === "flat") {
+              discountDisplay = `₹${discountValue.toFixed(2)}`;
+            }
+          }
+        }
+
+        const productName = orderProduct.name || "Unknown Product";
+        const variantName = variant?.name || "Default Variant";
+        const sku = variant?.sku || "N/A";
+        const price = orderProduct.price || 0;
+        const quantity = orderProduct.quantity || 1;
+        const total = (price * quantity).toFixed(2);
+
+        return `
+          <tr>
+            <td>${productName}</td>
+            <td>${variantName}</td>
+            <td>${sku}</td>
+            <td>${quantity}</td>
+            <td>₹${price.toFixed(2)}</td>
+            <td>${discountDisplay}</td>
+            <td>₹${total}</td>
+          </tr>`;
+      })
+    ).then((rows) => rows.join(""));
+
+    const productTable = `
+      <tr><th colspan="2">Products</th></tr>
+      <tr>
+        <td colspan="2">
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <th>Product</th>
+              <th>Variant</th>
+              <th>SKU</th>
+              <th>Quantity</th>
+              <th>Price</th>
+              <th>Discount</th>
+              <th>Total</th>
+            </tr>
+            ${productRows}
+          </table>
+        </td>
+      </tr>`;
+
+    // Send cancellation email to customer
+    const customerEmailBody = emailTemplate
       .replace("{{emailTitle}}", "Order Cancellation")
       .replace("{{greeting}}", `Dear ${order.userDetails.name}`)
       .replace(
@@ -1245,10 +1305,53 @@ const cancelOrder = async (req: any, res: Response) => {
         "{{closingMessage}}",
         "We’re sorry to see you cancel. Contact us if you need assistance."
       )
-      .replace("{{actionUrl}}", "https://www.gauraaj.com/orders")
+      .replace("{{actionUrl}}", "https://www.gauraaj.com/user-account/")
       .replace("{{actionText}}", "View Orders");
 
-    await sendEmail(order.userDetails.email, "Order Cancelled", emailBody);
+    await sendEmail(order.userDetails.email, "Order Cancelled", customerEmailBody);
+
+    // Send cancellation email to admin
+    try {
+      const adminEmailBody = emailTemplate
+        .replace("{{emailTitle}}", "Order Cancellation Notification")
+        .replace("{{greeting}}", "Dear Shop Owner")
+        .replace(
+          "{{mainMessage}}",
+          `An order has been cancelled by the customer. Please review the details below.`
+        )
+        .replace("{{orderId}}", orderId)
+        .replace("{{orderDate}}", order.orderDate.toLocaleDateString())
+        .replace("{{status}}", "Cancelled")
+        .replace(
+          "{{additionalDetails}}",
+          `<tr><th>Customer Name</th><td>${
+            order.userDetails?.name || "N/A"
+          }</td></tr>
+           <tr><th>Customer Phone</th><td><a href="https://wa.me/${
+             order.userDetails?.phone || ""
+           }">${order.userDetails?.phone || "N/A"}</a></td></tr>
+           <tr><th>Cancellation Reason</th><td>${reason}</td></tr>
+           ${productTable}`
+        )
+        .replace(
+          "{{closingMessage}}",
+          "Please take necessary actions if required. Contact support if you need assistance."
+        )
+        .replace(
+          "{{actionUrl}}",
+          `https://gauraaj-admin.vercel.app/admin/orders/${orderId}`
+        )
+        .replace("{{actionText}}", "View Order in Dashboard");
+
+      await sendEmail("ghccustomercare@gmail.com", "Order Cancelled", adminEmailBody);
+    } catch (emailError) {
+      console.error("Failed to send admin cancellation email:", {
+        error:
+          emailError instanceof Error ? emailError.message : "Unknown error",
+        stack: emailError instanceof Error ? emailError.stack : "Unknown stack",
+        orderId,
+      });
+    }
 
     return apiResponse(res, 200, true, "Order cancelled successfully.");
   } catch (error: any) {
