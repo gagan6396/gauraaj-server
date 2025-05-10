@@ -17,7 +17,6 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET as string,
 });
 
-
 // Email template for cancellation and order confirmation
 const emailTemplate = `
 <!DOCTYPE html>
@@ -25,7 +24,7 @@ const emailTemplate = `
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{emailTitle}}</title>
+  <title>Order Update</title>
   <style>
     body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
     .container { max-width: 600px; margin: 20px auto; background: #fff; padding: 20px; border-radius: 8px; }
@@ -41,7 +40,7 @@ const emailTemplate = `
 </head>
 <body>
   <div class="container">
-    <div class="header"><h2>{{emailTitle}}</h2></div>
+    <div class="header"><h2>Order Update</h2></div>
     <div class="content">
       <p>{{greeting}}</p>
       <p>{{mainMessage}}</p>
@@ -61,7 +60,7 @@ const emailTemplate = `
     </div>
     <div class="footer">
       <p>Gauraaj | <a href="{{companyWebsite}}">Visit our website</a></p>
-      <p>Contact us at <a href="mailto:{{supportEmail}}">{{supportEmail}}</a></p>
+      <p>Contact us at <a href="mailto:ghccustomercare@gmail.com">ghccustomercare@gmail.com</a></p>
       <p><a href="{{unsubscribeUrl}}">Unsubscribe</a></p>
     </div>
   </div>
@@ -115,7 +114,6 @@ const createOrder = async (req: Request, res: Response) => {
 };
 
 // Verify Razorpay Payment
-// Full updated verifyPayment function
 const verifyPayment = async (req: any, res: Response) => {
   try {
     const {
@@ -370,7 +368,7 @@ const verifyPayment = async (req: any, res: Response) => {
     // Send email to customer
     try {
       const customerEmailBody = emailTemplate
-        .replace("{{emailTitle}}", "Order Confirmation")
+        .replace("Order Update", "Order Confirmation")
         .replace(
           "{{greeting}}",
           `Dear ${order.userDetails?.name || "Customer"}`
@@ -398,7 +396,7 @@ const verifyPayment = async (req: any, res: Response) => {
         .replace("{{actionText}}", "View Your Order")
         .replace("{{companyName}}", emailData.companyName)
         .replace("{{companyWebsite}}", emailData.companyWebsite)
-        .replace("{{supportEmail}}", emailData.supportEmail)
+        .replace("ghccustomercare@gmail.com", emailData.supportEmail)
         .replace("{{whatsAppNumber}}", emailData.whatsAppNumber)
         .replace("{{whatsAppUrl}}", emailData.whatsAppUrl)
         .replace("{{unsubscribeUrl}}", emailData.unsubscribeUrl);
@@ -427,7 +425,7 @@ const verifyPayment = async (req: any, res: Response) => {
     // Send email to shop owner
     try {
       const shopOwnerEmailBody = emailTemplate
-        .replace("{{emailTitle}}", "New Order Notification")
+        .replace("Order Update", "New Order Notification")
         .replace("{{greeting}}", "Dear Shop Owner")
         .replace(
           "{{mainMessage}}",
@@ -460,7 +458,7 @@ const verifyPayment = async (req: any, res: Response) => {
         .replace("{{actionText}}", "View Order in Dashboard")
         .replace("{{companyName}}", emailData.companyName)
         .replace("{{companyWebsite}}", emailData.companyWebsite)
-        .replace("{{supportEmail}}", emailData.supportEmail)
+        .replace("ghccustomercare@gmail.com", emailData.supportEmail)
         .replace("{{whatsAppNumber}}", emailData.whatsAppNumber)
         .replace("{{whatsAppUrl}}", emailData.whatsAppUrl)
         .replace("{{unsubscribeUrl}}", emailData.unsubscribeUrl);
@@ -609,4 +607,3 @@ export {
   initiateRefund,
   verifyPayment
 };
-
