@@ -33,12 +33,6 @@ export const sendEmail = async (
       subject: `${subject} | Gauraaj Order Update`,
       html,
       replyTo: options.replyTo || "ghccustomercare@gmail.com",
-      headers: {
-        "X-Mailer": "Gauraaj Transactional Email",
-        "X-Priority": "3",
-        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-        ...options.headers,
-      },
     };
 
     const info = await transporter.sendMail(mailOptions);

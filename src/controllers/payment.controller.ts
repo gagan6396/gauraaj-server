@@ -404,14 +404,7 @@ const verifyPayment = async (req: any, res: Response) => {
       await sendEmail(
         order.userDetails?.email || "",
         "Order Confirmed",
-        customerEmailBody,
-        {
-          from: '"Gauraaj" <no-reply@gauraaj.com>',
-          headers: {
-            "List-Unsubscribe": `<${emailData.unsubscribeUrl}>`,
-            "X-PM-Message-Stream": "transactional",
-          },
-        }
+        customerEmailBody
       );
     } catch (emailError) {
       console.error("Failed to send customer confirmation email:", {
@@ -468,7 +461,7 @@ const verifyPayment = async (req: any, res: Response) => {
         "New Order Received",
         shopOwnerEmailBody,
         {
-          from: '"Gauraaj" <no-reply@gauraaj.com>',
+          from: '"Gauraaj" <ghccustomercare@gmail.com>',
           headers: {
             "List-Unsubscribe": `<${emailData.unsubscribeUrl}>`,
             "X-PM-Message-Stream": "transactional",
@@ -607,3 +600,4 @@ export {
   initiateRefund,
   verifyPayment
 };
+
