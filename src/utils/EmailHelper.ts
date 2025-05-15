@@ -28,11 +28,11 @@ export const sendEmail = async (
     });
 
     const mailOptions = {
-      from: options.from || `"Gauraaj" <${process.env.EMAIL_USER}>`,
+      // from: options.from || `"Gauraaj" <${process.env.EMAIL_USER}>`,
       to,
       subject: `${subject} | Gauraaj Order Update`,
       html,
-      replyTo: options.replyTo || "ghccustomercare@gmail.com",
+      // replyTo: options.replyTo || "ghccustomercare@gmail.com",
     };
 
     const info = await transporter.sendMail(mailOptions);

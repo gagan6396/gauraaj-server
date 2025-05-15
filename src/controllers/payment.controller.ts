@@ -61,7 +61,6 @@ const emailTemplate = `
     <div class="footer">
       <p>Gauraaj | <a href="{{companyWebsite}}">Visit our website</a></p>
       <p>Contact us at <a href="mailto:ghccustomercare@gmail.com">ghccustomercare@gmail.com</a></p>
-      <p><a href="{{unsubscribeUrl}}">Unsubscribe</a></p>
     </div>
   </div>
 </body>
@@ -304,9 +303,6 @@ const verifyPayment = async (req: any, res: Response) => {
       supportEmail: "ghccustomercare@gmail.com",
       whatsAppNumber: "+91-6397-90-4655",
       whatsAppUrl: "https://wa.me/+916397904655",
-      unsubscribeUrl: `https://www.gauraaj.com/unsubscribe?email=${encodeURIComponent(
-        order.userDetails?.email || ""
-      )}`,
     };
 
     // Generate product rows for email
@@ -398,8 +394,7 @@ const verifyPayment = async (req: any, res: Response) => {
         .replace("{{companyWebsite}}", emailData.companyWebsite)
         .replace("ghccustomercare@gmail.com", emailData.supportEmail)
         .replace("{{whatsAppNumber}}", emailData.whatsAppNumber)
-        .replace("{{whatsAppUrl}}", emailData.whatsAppUrl)
-        .replace("{{unsubscribeUrl}}", emailData.unsubscribeUrl);
+        .replace("{{whatsAppUrl}}", emailData.whatsAppUrl);
 
       await sendEmail(
         order.userDetails?.email || "",
@@ -453,8 +448,7 @@ const verifyPayment = async (req: any, res: Response) => {
         .replace("{{companyWebsite}}", emailData.companyWebsite)
         .replace("ghccustomercare@gmail.com", emailData.supportEmail)
         .replace("{{whatsAppNumber}}", emailData.whatsAppNumber)
-        .replace("{{whatsAppUrl}}", emailData.whatsAppUrl)
-        .replace("{{unsubscribeUrl}}", emailData.unsubscribeUrl);
+        .replace("{{whatsAppUrl}}", emailData.whatsAppUrl);
 
       await sendEmail(
         "ghccustomercare@gmail.com",
@@ -462,10 +456,6 @@ const verifyPayment = async (req: any, res: Response) => {
         shopOwnerEmailBody,
         {
           from: '"Gauraaj" <ghccustomercare@gmail.com>',
-          headers: {
-            "List-Unsubscribe": `<${emailData.unsubscribeUrl}>`,
-            "X-PM-Message-Stream": "transactional",
-          },
         }
       );
     } catch (emailError) {
