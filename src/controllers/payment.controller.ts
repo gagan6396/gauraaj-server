@@ -56,10 +56,8 @@ const emailTemplate = `
       {{productTable}}
       <p>{{closingMessage}}</p>
       <a href="{{actionUrl}}" class="button">{{actionText}}</a>
-      <p>Contact us on WhatsApp: <a href="{{whatsAppUrl}}">{{whatsAppNumber}}</a></p>
     </div>
     <div class="footer">
-      <p>Gauraaj | <a href="{{companyWebsite}}">Visit our website</a></p>
       <p>Contact us at <a href="mailto:ghccustomercare@gmail.com">ghccustomercare@gmail.com</a></p>
     </div>
   </div>
@@ -299,10 +297,8 @@ const verifyPayment = async (req: any, res: Response) => {
         Date.now() + estimatedDeliveryDays * 24 * 60 * 60 * 1000
       ).toLocaleDateString(),
       companyName: "Gauraaj",
-      companyWebsite: "https://www.gauraaj.com/",
       supportEmail: "ghccustomercare@gmail.com",
       whatsAppNumber: "+91-6397-90-4655",
-      whatsAppUrl: "https://wa.me/+916397904655",
     };
 
     // Generate product rows for email
@@ -391,10 +387,8 @@ const verifyPayment = async (req: any, res: Response) => {
         )
         .replace("{{actionText}}", "View Your Order")
         .replace("{{companyName}}", emailData.companyName)
-        .replace("{{companyWebsite}}", emailData.companyWebsite)
         .replace("ghccustomercare@gmail.com", emailData.supportEmail)
         .replace("{{whatsAppNumber}}", emailData.whatsAppNumber)
-        .replace("{{whatsAppUrl}}", emailData.whatsAppUrl);
 
       await sendEmail(
         order.userDetails?.email || "",
@@ -445,10 +439,8 @@ const verifyPayment = async (req: any, res: Response) => {
         )
         .replace("{{actionText}}", "View Order in Dashboard")
         .replace("{{companyName}}", emailData.companyName)
-        .replace("{{companyWebsite}}", emailData.companyWebsite)
         .replace("ghccustomercare@gmail.com", emailData.supportEmail)
-        .replace("{{whatsAppNumber}}", emailData.whatsAppNumber)
-        .replace("{{whatsAppUrl}}", emailData.whatsAppUrl);
+        .replace("{{whatsAppNumber}}", emailData.whatsAppNumber);
 
       await sendEmail(
         "ghccustomercare@gmail.com",
