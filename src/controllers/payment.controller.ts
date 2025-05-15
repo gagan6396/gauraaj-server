@@ -55,7 +55,6 @@ const emailTemplate = `
       </table>
       {{productTable}}
       <p>{{closingMessage}}</p>
-      <a href="{{actionUrl}}" class="button">{{actionText}}</a>
     </div>
     <div class="footer">
       <p>Contact us at <a href="mailto:ghccustomercare@gmail.com">ghccustomercare@gmail.com</a></p>
@@ -381,10 +380,10 @@ const verifyPayment = async (req: any, res: Response) => {
           "{{closingMessage}}",
           "We'll notify you once your order ships. If you have any questions, feel free to contact us."
         )
-        .replace(
-          "{{actionUrl}}",
-          `https://www.gauraaj.com/order-confirmation/${emailData.orderId}`
-        )
+        // .replace(
+        //   "{{actionUrl}}",
+        //   `https://www.gauraaj.com/order-confirmation/${emailData.orderId}`
+        // )
         .replace("{{actionText}}", "View Your Order")
         .replace("{{companyName}}", emailData.companyName)
         .replace("ghccustomercare@gmail.com", emailData.supportEmail)
@@ -433,10 +432,10 @@ const verifyPayment = async (req: any, res: Response) => {
           "{{closingMessage}}",
           "Please ensure the order is processed and shipped on time. Contact support if you encounter any issues."
         )
-        .replace(
-          "{{actionUrl}}",
-          `https://gauraaj-admin.vercel.app/admin/orders/${emailData.orderId}`
-        )
+        // .replace(
+        //   "{{actionUrl}}",
+        //   `https://gauraaj-admin.vercel.app/admin/orders/${emailData.orderId}`
+        // )
         .replace("{{actionText}}", "View Order in Dashboard")
         .replace("{{companyName}}", emailData.companyName)
         .replace("ghccustomercare@gmail.com", emailData.supportEmail)
