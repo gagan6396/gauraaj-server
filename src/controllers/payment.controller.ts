@@ -55,9 +55,10 @@ const emailTemplate = `
       </table>
       {{productTable}}
       <p>{{closingMessage}}</p>
+      <a href="{{actionUrl}}" class="button">{{actionText}}</a>
     </div>
     <div class="footer">
-      <p>Contact us at <a href="mailto:ghccustomercare@gmail.com">ghccustomercare@gmail.com</a></p>
+      <p>Contact us at <a href="mailto:nainwalsuman27@gmail.com">nainwalsuman27@gmail.com</a></p>
     </div>
   </div>
 </body>
@@ -296,7 +297,7 @@ const verifyPayment = async (req: any, res: Response) => {
         Date.now() + estimatedDeliveryDays * 24 * 60 * 60 * 1000
       ).toLocaleDateString(),
       companyName: "Gauraaj",
-      supportEmail: "ghccustomercare@gmail.com",
+      supportEmail: "nainwalsuman27@gmail.com",
       whatsAppNumber: "+91-6397-90-4655",
     };
 
@@ -380,13 +381,13 @@ const verifyPayment = async (req: any, res: Response) => {
           "{{closingMessage}}",
           "We'll notify you once your order ships. If you have any questions, feel free to contact us."
         )
-        // .replace(
-        //   "{{actionUrl}}",
-        //   `https://www.gauraaj.com/order-confirmation/${emailData.orderId}`
-        // )
+        .replace(
+          "{{actionUrl}}",
+          `https://www.gauraaj.com/order-confirmation/${emailData.orderId}`
+        )
         .replace("{{actionText}}", "View Your Order")
         .replace("{{companyName}}", emailData.companyName)
-        .replace("ghccustomercare@gmail.com", emailData.supportEmail)
+        .replace("nainwalsuman27@gmail.com", emailData.supportEmail)
         .replace("{{whatsAppNumber}}", emailData.whatsAppNumber)
 
       await sendEmail(
@@ -432,21 +433,21 @@ const verifyPayment = async (req: any, res: Response) => {
           "{{closingMessage}}",
           "Please ensure the order is processed and shipped on time. Contact support if you encounter any issues."
         )
-        // .replace(
-        //   "{{actionUrl}}",
-        //   `https://gauraaj-admin.vercel.app/admin/orders/${emailData.orderId}`
-        // )
+        .replace(
+          "{{actionUrl}}",
+          `https://gauraaj-admin.vercel.app/admin/orders/${emailData.orderId}`
+        )
         .replace("{{actionText}}", "View Order in Dashboard")
         .replace("{{companyName}}", emailData.companyName)
-        .replace("ghccustomercare@gmail.com", emailData.supportEmail)
+        .replace("nainwalsuman27@gmail.com", emailData.supportEmail)
         .replace("{{whatsAppNumber}}", emailData.whatsAppNumber);
 
       await sendEmail(
-        "ghccustomercare@gmail.com",
+        "nainwalsuman27@gmail.com",
         "New Order Received",
         shopOwnerEmailBody,
         {
-          from: '"Gauraaj" <ghccustomercare@gmail.com>',
+          from: '"Gauraaj" <nainwalsuman27@gmail.com>',
         }
       );
     } catch (emailError) {
