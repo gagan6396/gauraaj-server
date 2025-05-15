@@ -388,7 +388,7 @@ const verifyPayment = async (req: any, res: Response) => {
         .replace("{{actionText}}", "View Your Order")
         .replace("{{companyName}}", emailData.companyName)
         .replace("nainwalsuman27@gmail.com", emailData.supportEmail)
-        .replace("{{whatsAppNumber}}", emailData.whatsAppNumber)
+        .replace("{{whatsAppNumber}}", emailData.whatsAppNumber);
 
       await sendEmail(
         order.userDetails?.email || "",
@@ -445,10 +445,7 @@ const verifyPayment = async (req: any, res: Response) => {
       await sendEmail(
         "nainwalsuman27@gmail.com",
         "New Order Received",
-        shopOwnerEmailBody,
-        {
-          from: '"Gauraaj" <nainwalsuman27@gmail.com>',
-        }
+        shopOwnerEmailBody
       );
     } catch (emailError) {
       console.error("Failed to send shop owner notification email:", {
