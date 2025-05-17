@@ -5,23 +5,19 @@ const generateOtp = () => {
   return crypto.randomInt(100000, 999999).toString();
 };
 
-// Sending the email using SendGrid SMTP Relay
+// Sending the email
 export const sendEmail = async (to: string, subject: string, html: string) => {
   try {
     const transporter = nodemailer.createTransport({
-      host: "smtp.sendgrid.net",
-      port: 587, // Use 587 for TLS or 465 for SSL
-      secure: false, // true for 465, false for 587
+      service: "gmail",
       auth: {
-        user: "apikey", // SendGrid requires "apikey" as the username
-        pass: process.env.SENDGRID_API_KEY, // Your SendGrid API key
+        user: process.env.EMAIL_USER, // Your Gmail address (set in .env)
+        pass: process.env.EMAIL_PASS, // Your Gmail App Password (set in .env)
       },
     });
 
     const mailOptions = {
-      from:
-        process.env.SENDGRID_VERIFIED_SENDER ||
-        `"Gauraaj" <no-reply@gauraaj.com>`,
+      from: process.env.EMAIL_USER,
       to,
       subject: `${subject} | Gauraaj Order Update`,
       html,
@@ -44,10 +40,10 @@ export const sendEmail = async (to: string, subject: string, html: string) => {
 const sendOtpEmail = async (email: string): Promise<string> => {
   const otp = generateOtp();
   const subject = "Your OTP for Password Reset";
-  const html = `<p>Your OTP to reset your password is: <strong>${otp}</strong>. Please use it within the next 10 minutes.</p>`;
+  const text = `Your OTP to reset your password is: ${otp}. Please use it within the next 10 minutes.`;
 
   try {
-    await sendEmail(email, subject, html);
+    await sendEmail(email, subject, text);
     return otp;
   } catch (error) {
     console.error("Error sending OTP email", error);
