@@ -11,7 +11,7 @@ services:
     environment:
       - NODE_ENV=production
       - KAFKA_BROKER=kafka:9092 # This matches Kafka's advertised listener
-      - DATABASE_URL=mongodb://admin:Rishabh1234%25@213.210.36.87:27017/gauraaj?authSource=admin
+      - DATABASE_URL=mongodb+srv://ghccustomercare:lNm0Ne6KIUKdBz6P@gauraaj.fqre3ft.mongodb.net/?retryWrites=true&w=majority&appName=gauraaj
       - PORT=4001
       - REDIS_HOST=redis
       - REDIS_PORT=6379
