@@ -324,12 +324,17 @@ const calculateShippingCharges = async (req: any, res: Response) => {
     }
 
     // Map courier options
-    const shippingOptions = couriers.map((courier: any) => ({
-      courierName: courier.courier_name,
-      rate: courier.rate,
-      estimatedDeliveryDays: courier.estimated_delivery_days,
-      type: courier.is_express ? "Express" : "Standard",
-    }));
+    // Map courier options and filter out "Xpressbees Surface_Stressed"
+    const shippingOptions = couriers
+      .filter(
+        (courier: any) => courier.courier_name !== "Xpressbees Surface_Stressed"
+      )
+      .map((courier: any) => ({
+        courierName: courier.courier_name,
+        rate: courier.rate,
+        estimatedDeliveryDays: courier.estimated_delivery_days,
+        type: courier.is_express ? "Express" : "Standard",
+      }));
 
     return apiResponse(res, 200, true, "Shipping charges calculated.", {
       shippingOptions,
@@ -1308,7 +1313,11 @@ const cancelOrder = async (req: any, res: Response) => {
       .replace("{{actionUrl}}", "https://www.gauraaj.com/user-account/")
       .replace("{{actionText}}", "View Orders");
 
-    await sendEmail(order.userDetails.email, "Order Cancelled", customerEmailBody);
+    await sendEmail(
+      order.userDetails.email,
+      "Order Cancelled",
+      customerEmailBody
+    );
 
     // Send cancellation email to admin
     try {
@@ -1343,7 +1352,11 @@ const cancelOrder = async (req: any, res: Response) => {
         )
         .replace("{{actionText}}", "View Order in Dashboard");
 
-      await sendEmail("ghccustomercare@gmail.com", "Order Cancelled", adminEmailBody);
+      await sendEmail(
+        "ghccustomercare@gmail.com",
+        "Order Cancelled",
+        adminEmailBody
+      );
     } catch (emailError) {
       console.error("Failed to send admin cancellation email:", {
         error:
