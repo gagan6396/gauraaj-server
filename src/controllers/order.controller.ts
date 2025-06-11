@@ -327,7 +327,8 @@ const calculateShippingCharges = async (req: any, res: Response) => {
     // Map courier options and filter out "Xpressbees Surface_Stressed"
     const shippingOptions = couriers
       .filter(
-        (courier: any) => courier.courier_name !== "Xpressbees Surface_Stressed"
+        (courier: any) =>
+          !courier.courier_name.toLowerCase().includes("xpressbees")
       )
       .map((courier: any) => ({
         courierName: courier.courier_name,
