@@ -77,7 +77,6 @@ export const getShipRocketToken = async (): Promise<string> => {
 
 // Create Shiprocket order
 
-
 const createShipRocketOrder = async (data: {
   orderId: string;
   products: any[];
@@ -175,48 +174,36 @@ const createShipRocketOrder = async (data: {
         0
       ),
       sub_total: parseFloat(data.totalAmount.toString()),
-      length: Math.max(
-        data.products.reduce(
-          (max, item) =>
-            Math.max(
-              max,
-              parseFloat(item.skuParameters?.length?.toString()) || 10
-            ),
-          10
-        ),
-        10
+      weight: data.products.reduce(
+        (total, item) =>
+          total +
+          (parseFloat(item.skuParameters?.weight?.toString()) || 0.5) *
+            item.quantity,
+        0
       ),
-      breadth: Math.max(
-        data.products.reduce(
-          (max, item) =>
-            Math.max(
-              max,
-              parseFloat(item.skuParameters?.breadth?.toString()) || 10
-            ),
-          10
-        ),
-        10
+      length: data.products.reduce(
+        (max, item) =>
+          Math.max(
+            max,
+            parseFloat(item.skuParameters?.length?.toString()) || 10
+          ),
+        0
       ),
-      height: Math.max(
-        data.products.reduce(
-          (max, item) =>
-            Math.max(
-              max,
-              parseFloat(item.skuParameters?.height?.toString()) || 10
-            ),
-          10
-        ),
-        10
+      breadth: data.products.reduce(
+        (max, item) =>
+          Math.max(
+            max,
+            parseFloat(item.skuParameters?.breadth?.toString()) || 10
+          ),
+        0
       ),
-      weight: Math.max(
-        data.products.reduce(
-          (total, item) =>
-            total +
-            (parseFloat(item.skuParameters?.weight?.toString()) || 0.5) *
-              item.quantity,
-          0
-        ),
-        0.5
+      height: data.products.reduce(
+        (max, item) =>
+          Math.max(
+            max,
+            parseFloat(item.skuParameters?.height?.toString()) || 10
+          ),
+        0
       ),
       courier_name: data.courierName.toLowerCase(),
     };
