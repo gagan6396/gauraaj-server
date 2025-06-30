@@ -12,21 +12,6 @@ const getSupplierProfile = async (req: any, res: Response) => {
       return apiResponse(res, 400, false, "Supplier ID is required");
     }
 
-    // Check Redis cache first
-    const cachedSupplierProfile = await redisClient.get(
-      `supplierProfile:${supplierId}`
-    );
-    if (cachedSupplierProfile) {
-      console.log("Returning supplier profile from cache.");
-      return apiResponse(
-        res,
-        200,
-        true,
-        "Supplier profile fetched successfully (from cache)",
-        JSON.parse(cachedSupplierProfile)
-      );
-    }
-
     const supplier = await supplierModel
       .findById(supplierId)
       .select("-password")
@@ -40,10 +25,6 @@ const getSupplierProfile = async (req: any, res: Response) => {
       return apiResponse(res, 404, false, "Supplier not found");
     }
 
-    // Cached the supplier Profile
-    const cacheKey = `supplierProfile:${supplierId}`;
-    await redisClient.setEx(cacheKey, 3600, JSON.stringify(supplier));
-
     return apiResponse(
       res,
       200,
@@ -52,10 +33,11 @@ const getSupplierProfile = async (req: any, res: Response) => {
       supplier
     );
   } catch (error) {
-    console.error("Error fetching supplier profile");
+    console.error("Error fetching supplier profile:", error);
     return apiResponse(res, 500, false, "Error Fetching SupplierProfile");
   }
 };
+
 
 const updateSupplierProfile = async (req: any, res: Response) => {
   try {
