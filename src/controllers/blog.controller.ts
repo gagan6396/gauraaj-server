@@ -139,7 +139,7 @@ export const updateBlog = async (req: any, res: Response) => {
       JSON.parse(req.body.data);
 
     const author = req.user?.id; // Assuming authMiddleware sets req.user
-    const imageUrl = req.body.imageUrls[0] || "";
+    const imageUrl = req.body.imageUrls?.[0] || "";
     console.log("req.body", req.body.data);
 
     const blog: any = await Blog.findById(req.params.id);
