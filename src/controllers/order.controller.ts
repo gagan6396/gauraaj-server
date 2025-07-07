@@ -325,7 +325,8 @@ const calculateShippingCharges = async (req: any, res: Response) => {
 
     // Map courier options
     // Map courier options and filter out "Xpressbees Surface_Stressed"
-    const excludedCouriers = ["xpressbees", "shadowfax", "indiapost"];
+
+    const excludedCouriers = ["xpressbees", "shadowfax", "india post"];
 
     const shippingOptions = couriers
       .filter(
