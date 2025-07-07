@@ -330,7 +330,9 @@ const calculateShippingCharges = async (req: any, res: Response) => {
     const shippingOptions = couriers
       .filter(
         (courier: any) =>
-          !excludedCouriers.includes(courier.courier_name.toLowerCase())
+          !excludedCouriers.some((excluded) =>
+            courier.courier_name.toLowerCase().includes(excluded)
+          )
       )
       .map((courier: any) => ({
         courierName: courier.courier_name,
