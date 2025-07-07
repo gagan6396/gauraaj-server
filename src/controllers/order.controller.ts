@@ -325,10 +325,12 @@ const calculateShippingCharges = async (req: any, res: Response) => {
 
     // Map courier options
     // Map courier options and filter out "Xpressbees Surface_Stressed"
+    const excludedCouriers = ["xpressbees", "shadowfax", "indiapost"];
+
     const shippingOptions = couriers
       .filter(
         (courier: any) =>
-          !courier.courier_name.toLowerCase().includes("xpressbees")
+          !excludedCouriers.includes(courier.courier_name.toLowerCase())
       )
       .map((courier: any) => ({
         courierName: courier.courier_name,
