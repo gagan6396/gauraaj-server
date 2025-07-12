@@ -594,9 +594,9 @@ const shiprocketWebhook = async (req: Request, res: Response) => {
     } = req.body;
 
     // Validate webhook token (Shiprocket provides a token for security)
-    if (webhook_token !== process.env.SHIPROCKET_WEBHOOK_TOKEN) {
-      return apiResponse(res, 401, false, "Invalid webhook token");
-    }
+    // if (webhook_token !== process.env.SHIPROCKET_WEBHOOK_TOKEN) {
+    //   return apiResponse(res, 401, false, "Invalid webhook token");
+    // }
 
     // Validate required fields
     if (!order_id || !shipment_status || !shipment_status_id) {

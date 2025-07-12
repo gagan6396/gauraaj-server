@@ -19,6 +19,5 @@ paymentRoute.get("/:paymentId", authMiddleware, getPaymentDetailsById);
 paymentRoute.post("/refund/:paymentId", authMiddleware, initiateRefund);
 paymentRoute.get("/history/:userId", authMiddleware, getPaymentHistory);
 paymentRoute.post("/shiprocket/webhook", shiprocketWebhook);
-paymentRoute.get("/shiprocket/webhook", shiprocketWebhook);
 
 export default paymentRoute;
