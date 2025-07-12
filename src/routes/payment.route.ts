@@ -4,6 +4,7 @@ import {
   getPaymentDetailsById,
   getPaymentHistory,
   initiateRefund,
+  shiprocketWebhook,
   verifyPayment,
 } from "../controllers/payment.controller";
 import authMiddleware from "../middlewares/authMiddleware";
@@ -17,5 +18,6 @@ paymentRoute.post("/verify", authMiddleware, verifyPayment);
 paymentRoute.get("/:paymentId", authMiddleware, getPaymentDetailsById);
 paymentRoute.post("/refund/:paymentId", authMiddleware, initiateRefund);
 paymentRoute.get("/history/:userId", authMiddleware, getPaymentHistory);
+paymentRoute.post("/shiprocket/webhook", shiprocketWebhook);
 
 export default paymentRoute;
