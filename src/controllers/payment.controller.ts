@@ -584,12 +584,18 @@ const getPaymentHistory = async (req: Request, res: Response) => {
 const shiprocketWebhook = async (req: Request, res: Response) => {
   try {
     const {
-      awb_code,
+      awb,
+      current_status,
+      current_status_id,
       order_id,
       shipment_status,
       shipment_status_id,
       courier_name,
       current_timestamp,
+      etd,
+      channel,
+      channel_order_id,
+      scans,
       webhook_token,
     } = req.body;
 
@@ -611,7 +617,7 @@ const shiprocketWebhook = async (req: Request, res: Response) => {
       10: "Returned", // Shiprocket "RTO Delivered"
     };
 
-    const newShippingStatus = statusMap[shipment_status_id] || "Unknown";
+    const newShippingStatus = statusMap[shipment_status_id] || current_status || "Unknown";
 
     // Find order by Shiprocket order ID
     const order = await orderModel.findOne({ shipRocketOrderId: order_id });
@@ -628,7 +634,17 @@ const shiprocketWebhook = async (req: Request, res: Response) => {
     // Update shipping and order status
     shipping.shippingStatus = newShippingStatus;
     shipping.courierService = courier_name || shipping.courierService;
-    shipping.awbCode = awb_code || shipping.awbCode;
+    shipping.awbCode = awb || shipping.awbCode;
+    shipping.channel = channel || shipping.channel || "N/A";
+    shipping.channelOrderId = channel_order_id || shipping.channelOrderId || "N/A";
+    shipping.estimatedDeliveryDate = etd ? new Date(etd) : shipping.estimatedDeliveryDate;
+    shipping.scans = scans
+      ? scans.map((scan: { date: string; activity: string; location: string }) => ({
+          date: new Date(scan.date),
+          activity: scan.activity,
+          location: scan.location,
+        }))
+      : shipping.scans || [];
     shipping.updatedAt = new Date(current_timestamp || Date.now());
     await shipping.save();
 
@@ -647,11 +663,9 @@ const shiprocketWebhook = async (req: Request, res: Response) => {
       orderId: order._id.toString(),
       orderDate: order.createdAt.toLocaleDateString(),
       totalAmount: `₹${order.totalAmount.toFixed(2)}`,
-      paymentMethod:
-        order.paymentMethod === 0 ? "Razorpay" : "Cash on Delivery",
+      paymentMethod: order.paymentMethod === 0 ? "Razorpay" : "Cash on Delivery",
       shippingAddress: `${shipping.addressSnapshot.addressLine1}, ${shipping.addressSnapshot.city}, ${shipping.addressSnapshot.state}, ${shipping.addressSnapshot.postalCode}, ${shipping.addressSnapshot.country}`,
-      estimatedDeliveryDate:
-        shipping.estimatedDeliveryDate.toLocaleDateString(),
+      estimatedDeliveryDate: shipping.estimatedDeliveryDate.toLocaleDateString(),
       companyName: "Gauraaj",
       companyWebsite: "https://www.gauraaj.com/",
       supportEmail: "ghccustomercare@gmail.com",
@@ -715,6 +729,31 @@ const shiprocketWebhook = async (req: Request, res: Response) => {
         ${productRows}
       </table>`;
 
+    // Generate scan table for email (only for Shipped or Delivered statuses)
+    let scanTable = "";
+    if (["Shipped", "Delivered"].includes(newShippingStatus) && scans && scans.length > 0) {
+      const scanRows = scans
+        .map(
+          (scan: { date: string; activity: string; location: string }) => `
+          <tr>
+            <td>${new Date(scan.date).toLocaleString()}</td>
+            <td>${scan.activity}</td>
+            <td>${scan.location}</td>
+          </tr>`
+        )
+        .join("");
+      scanTable = `
+        <h3>Shipment Tracking</h3>
+        <table class="scan-details">
+          <tr>
+            <th>Date</th>
+            <th>Activity</th>
+            <th>Location</th>
+          </tr>
+          ${scanRows}
+        </table>`;
+    }
+
     // Prepare email content based on status
     let emailSubject = "";
     let mainMessage = "";
@@ -725,24 +764,19 @@ const shiprocketWebhook = async (req: Request, res: Response) => {
     switch (newShippingStatus) {
       case "Shipped":
         emailSubject = "Your Order Has Been Shipped";
-        mainMessage = `Great news! Your order has been shipped via ${
-          courier_name || "our courier service"
-        } with AWB ${awb_code || "N/A"}.`;
+        mainMessage = `Great news! Your order has been shipped via ${courier_name || "our courier service"} with AWB ${awb || "N/A"}.`;
         break;
       case "Delivered":
         emailSubject = "Your Order Has Been Delivered";
-        mainMessage =
-          "Your order has been successfully delivered. We hope you enjoy your purchase!";
+        mainMessage = "Your order has been successfully delivered. We hope you enjoy your purchase!";
         break;
       case "Cancelled":
         emailSubject = "Your Order Has Been Cancelled";
-        mainMessage =
-          "We're sorry, but your order has been cancelled. Please contact us for more details.";
+        mainMessage = "We're sorry, but your order has been cancelled. Please contact us for more details.";
         break;
       case "Returned":
         emailSubject = "Your Order Has Been Returned";
-        mainMessage =
-          "Your order has been returned. Please contact us for assistance.";
+        mainMessage = "Your order has been returned. Please contact us for assistance.";
         break;
       default:
         emailSubject = "Order Status Update";
@@ -766,6 +800,7 @@ const shiprocketWebhook = async (req: Request, res: Response) => {
         .replace("{{estimatedDeliveryDate}}", emailData.estimatedDeliveryDate)
         .replace("{{additionalDetails}}", "")
         .replace("{{productTable}}", productTable)
+        .replace("{{scanTable}}", scanTable)
         .replace(
           "{{closingMessage}}",
           "Thank you for shopping with us! If you have any questions, feel free to contact us."
@@ -799,9 +834,7 @@ const shiprocketWebhook = async (req: Request, res: Response) => {
         .replace("{{greeting}}", "Dear Shop Owner")
         .replace(
           "{{mainMessage}}",
-          `Order ${order_id} has been updated to ${newShippingStatus} status via ${
-            courier_name || "the courier service"
-          }.`
+          `Order ${order_id} has been updated to ${newShippingStatus} status via ${courier_name || "the courier service"}.`
         )
         .replace("{{orderId}}", emailData.orderId)
         .replace("{{orderDate}}", emailData.orderDate)
@@ -811,15 +844,14 @@ const shiprocketWebhook = async (req: Request, res: Response) => {
         .replace("{{estimatedDeliveryDate}}", emailData.estimatedDeliveryDate)
         .replace(
           "{{additionalDetails}}",
-          `<tr><th>Customer Name</th><td>${
-            order.userDetails?.name || "N/A"
-          }</td></tr>
-           <tr><th>Customer Phone</th><td><a href="https://wa.me/${
-             order.userDetails?.phone || ""
-           }">${order.userDetails?.phone || "N/A"}</a></td></tr>
-           <tr><th>AWB Code</th><td>${awb_code || "N/A"}</td></tr>`
+          `<tr><th>Customer Name</th><td>${order.userDetails?.name || "N/A"}</td></tr>
+           <tr><th>Customer Phone</th><td><a href="https://wa.me/${order.userDetails?.phone || ""}">${order.userDetails?.phone || "N/A"}</a></td></tr>
+           <tr><th>AWB Code</th><td>${awb || "N/A"}</td></tr>
+           <tr><th>Channel</th><td>${channel || "N/A"}</td></tr>
+           <tr><th>Channel Order ID</th><td>${channel_order_id || "N/A"}</td></tr>`
         )
         .replace("{{productTable}}", productTable)
+        .replace("{{scanTable}}", scanTable)
         .replace(
           "{{closingMessage}}",
           "Please take appropriate actions based on the new status. Contact support if needed."
@@ -866,6 +898,8 @@ export {
   createOrder,
   getPaymentDetailsById,
   getPaymentHistory,
-  initiateRefund, shiprocketWebhook, verifyPayment
+  initiateRefund,
+  shiprocketWebhook,
+  verifyPayment
 };
 
