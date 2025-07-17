@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import mongoose from "mongoose";
 import { sendMessageToKafka } from "../config/kafkaConfig";
 import shipRocketConfig from "../config/shipRocketConfig";
@@ -88,54 +88,65 @@ const createShipRocketOrder = async (data: {
   try {
     console.log("products", data.products);
 
-    // Validate required fields
-    if (!data.products?.length) {
+    if (!data.products?.length)
       throw new Error("No products provided for Shiprocket order");
-    }
-    if (!data.addressSnapshot?.postalCode?.match(/^\d{6}$/)) {
+    if (!data.addressSnapshot?.postalCode?.match(/^\d{6}$/))
       throw new Error("Invalid billing pincode");
-    }
+
+    // Validate and fallback phone number
     if (
       data.addressSnapshot?.phone &&
       !data.addressSnapshot.phone.match(/^\+?\d{10,12}$/)
     ) {
       console.warn(
-        "Invalid billing phone number, using fallback:",
+        "Invalid phone, using fallback:",
         data.addressSnapshot.phone
       );
-      data.addressSnapshot.phone = "9876543210"; // Fallback for testing
+      data.addressSnapshot.phone = "9876543210";
     }
-    if (!data.courierName) {
+
+    if (!data.courierName)
       throw new Error("Courier name is required for Shiprocket order");
-    }
 
     const token = await getShipRocketToken();
 
-    // Fetch SKUs for products if missing in skuParameters
+    // Construct order items and prepare volume calculation
+    let totalWeight = 0;
+    let totalVolume = 0;
+
     const orderItems = await Promise.all(
       data.products.map(async (item) => {
         let sku = item.skuParameters?.sku;
+
         if (!sku) {
-          // Fetch product to get SKU
           const product = await productModel.findById(item.productId);
-          if (product) {
-            const variant = product.variants.find(
-              (v: any) => v._id.toString() === item.variantId
-            );
-            sku = variant?.sku || item.productId.toString(); // Fallback to productId if variant SKU is missing
-          } else {
-            sku = item.productId.toString(); // Fallback if product not found
-          }
+          const variant = product?.variants.find(
+            (v: any) => v._id.toString() === item.variantId
+          );
+          sku = variant?.sku || item.productId.toString();
         }
 
-        if (!item.name || !item.quantity || !item.price) {
+        const weight =
+          parseFloat(item.skuParameters?.weight?.toString()) || 0.5;
+        const length = parseFloat(item.skuParameters?.length?.toString()) || 10;
+        const breadth =
+          parseFloat(item.skuParameters?.breadth?.toString()) || 10;
+        const height = parseFloat(item.skuParameters?.height?.toString()) || 10;
+
+        const units = parseInt(item.quantity.toString(), 10);
+        const itemVolume = length * breadth * height;
+
+        totalWeight += weight * units;
+        totalVolume += itemVolume * units;
+
+        if (!item.name || !units || !item.price) {
           throw new Error(`Invalid product data: ${JSON.stringify(item)}`);
         }
 
         return {
           name: item.name,
           sku,
-          units: parseInt(item.quantity.toString(), 10),
+          units,
           selling_price: parseFloat(item.price.toString()),
           discount: parseFloat(item.discount?.toString() || "0"),
           tax: parseFloat(item.tax?.toString() || "0"),
@@ -143,6 +154,14 @@ const createShipRocketOrder = async (data: {
         };
       })
     );
+
+    // Calculate cubic box dimensions from total volume
+    const cubicDimension = parseFloat(Math.cbrt(totalVolume).toFixed(2));
+    const finalDimensions = {
+      length: cubicDimension,
+      breadth: cubicDimension,
+      height: cubicDimension,
+    };
 
     const payload = {
       order_id: data.orderId,
@@ -174,37 +193,10 @@ const createShipRocketOrder = async (data: {
         0
       ),
       sub_total: parseFloat(data.totalAmount.toString()),
-      weight: data.products.reduce(
-        (total, item) =>
-          total +
-          (parseFloat(item.skuParameters?.weight?.toString()) || 0.5) *
-            item.quantity,
-        0
-      ),
-      length: data.products.reduce(
-        (max, item) =>
-          Math.max(
-            max,
-            parseFloat(item.skuParameters?.length?.toString()) || 10
-          ),
-        0
-      ),
-      breadth: data.products.reduce(
-        (max, item) =>
-          Math.max(
-            max,
-            parseFloat(item.skuParameters?.breadth?.toString()) || 10
-          ),
-        0
-      ),
-      height: data.products.reduce(
-        (max, item) =>
-          Math.max(
-            max,
-            parseFloat(item.skuParameters?.height?.toString()) || 10
-          ),
-        0
-      ),
+      weight: totalWeight,
+      length: finalDimensions.length,
+      breadth: finalDimensions.breadth,
+      height: finalDimensions.height,
       courier_name: data.courierName.toLowerCase(),
     };
 
@@ -226,21 +218,24 @@ const createShipRocketOrder = async (data: {
 
     return response.data;
   } catch (error: any) {
-    const errorDetails = error
-      ? {
-          status: error.response?.status,
-          message: error.response?.data?.message || error.message,
-          errors: error.response?.data?.errors || [],
-          requestPayload: error.config?.data,
-        }
-      : {
-          message: error.message,
-          stack: error.stack,
-        };
+    const errorDetails =
+      error instanceof AxiosError
+        ? {
+            status: error.response?.status,
+            message: error.response?.data?.message || error.message,
+            errors: error.response?.data?.errors || [],
+            requestPayload: error.config?.data,
+          }
+        : {
+            message: error.message,
+            stack: error.stack,
+          };
+
     console.error("Shiprocket order creation failed:", errorDetails);
     throw new Error(`Shiprocket error: ${errorDetails.message}`);
   }
 };
+
 const cancelShipRocketOrder = async (
   orderId: string,
   shipRocketOrderId: number

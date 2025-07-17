@@ -215,7 +215,7 @@ const calculateShippingCharges = async (req: any, res: Response) => {
     const userId = req?.user?.id;
     const { postalCode, products, isCOD } = req.body;
 
-    // Validate inputs
+    // Input validation
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return apiResponse(res, 400, false, "Invalid user ID.");
     }
@@ -229,10 +229,9 @@ const calculateShippingCharges = async (req: any, res: Response) => {
     }
 
     let totalWeight = 0;
-    let totalDimensions = { length: 0, width: 0, height: 0 };
+    let totalVolume = 0;
     let subTotal = 0;
 
-    // Calculate total weight, dimensions, and subtotal
     for (const item of products) {
       const product = await productModel.findById(item.productId);
       if (!product) {
@@ -243,6 +242,7 @@ const calculateShippingCharges = async (req: any, res: Response) => {
           `Product not found: ${item.productId}`
         );
       }
+
       const variant = product.variants.find((v: any) =>
         v._id.equals(item.variantId)
       );
@@ -256,41 +256,32 @@ const calculateShippingCharges = async (req: any, res: Response) => {
       }
 
       totalWeight += variant.weight * item.quantity;
-      totalDimensions.length += variant.dimensions.length * item.quantity;
-      totalDimensions.width += variant.dimensions.width * item.quantity;
-      totalDimensions.height += variant.dimensions.height * item.quantity;
+
+      const itemVolume =
+        variant.dimensions.length *
+        variant.dimensions.width *
+        variant.dimensions.height;
+
+      totalVolume += itemVolume * item.quantity;
+
       subTotal += parseFloat(variant.price.toString()) * item.quantity;
     }
 
-    // Validate calculated values
-    if (totalWeight <= 0) {
-      return apiResponse(
-        res,
-        400,
-        false,
-        "Total weight must be greater than zero."
-      );
-    }
-    if (
-      totalDimensions.length <= 0 ||
-      totalDimensions.width <= 0 ||
-      totalDimensions.height <= 0
-    ) {
-      return apiResponse(
-        res,
-        400,
-        false,
-        "Dimensions must be greater than zero."
-      );
+    if (totalWeight <= 0 || totalVolume <= 0) {
+      return apiResponse(res, 400, false, "Invalid package weight or volume.");
     }
 
-    // Get Shiprocket token
+    // Approximate cubic box from total volume
+    const cubicDimension = parseFloat(Math.cbrt(totalVolume).toFixed(2));
+    const finalDimensions = {
+      length: cubicDimension,
+      width: cubicDimension,
+      height: cubicDimension,
+    };
+
     const token = await getShipRocketToken();
-
-    // Configurable pickup postcode (from environment or default)
     const pickupPostcode = process.env.SHIPROCKET_PICKUP_POSTCODE || "248001";
 
-    // Make API request to Shiprocket
     const response = await axios.get(
       `${shipRocketConfig.baseUrl}/v1/external/courier/serviceability/`,
       {
@@ -302,37 +293,35 @@ const calculateShippingCharges = async (req: any, res: Response) => {
           pickup_postcode: pickupPostcode,
           delivery_postcode: postalCode,
           weight: totalWeight,
-          length: totalDimensions.length,
-          breadth: totalDimensions.width,
-          height: totalDimensions.height,
+          length: finalDimensions.length,
+          breadth: finalDimensions.width,
+          height: finalDimensions.height,
           cod: isCOD,
-          declared_value: subTotal, // Required field
+          declared_value: subTotal,
         },
       }
     );
 
     console.log("ShipRocket response:", response.data);
 
-    const couriers = response.data.data.available_courier_companies;
+    const couriers = response.data?.data?.available_courier_companies || [];
+
     if (!couriers.length) {
       return apiResponse(
         res,
         400,
         false,
-        "No couriers available for this location."
+        response.data?.message || "No couriers available for this location."
       );
     }
-
-    // Map courier options
-    // Map courier options and filter out "Xpressbees Surface_Stressed"
 
     const excludedCouriers = ["xpressbees", "shadowfax", "india post"];
 
     const shippingOptions = couriers
       .filter(
         (courier: any) =>
-          !excludedCouriers.some((excluded) =>
-            courier.courier_name.toLowerCase().includes(excluded)
+          !excludedCouriers.some((ex) =>
+            courier.courier_name.toLowerCase().includes(ex)
           )
       )
       .map((courier: any) => ({
@@ -346,9 +335,9 @@ const calculateShippingCharges = async (req: any, res: Response) => {
       shippingOptions,
       subTotal,
       totalWeight,
+      dimensions: finalDimensions,
     });
   } catch (error: any) {
-    // Enhanced error handling for Axios errors
     if (error instanceof AxiosError) {
       const errorMessage =
         error.response?.data?.message || "Failed to fetch shipping charges";
@@ -584,55 +573,56 @@ const processProducts = async (products: any[]) => {
   return { totalAmount, updatedProducts };
 };
 
-const calculateShippingChargesForOrder = async (
+export const calculateShippingChargesForOrder = async (
   products: any[],
   postalCode: string,
-  courierName: string, // Changed from shippingMethod to courierName
+  courierName: string,
   isCOD: number
 ) => {
   try {
     let totalWeight = 0;
-    let totalDimensions = { length: 0, width: 0, height: 0 };
+    let totalVolume = 0;
     let subTotal = 0;
 
-    // Calculate total weight, dimensions, and subtotal
     for (const item of products) {
       const product = await productModel.findById(item.productId);
       if (!product) {
         throw new Error(`Product not found: ${item.productId}`);
       }
+
       const variant = product.variants.find((v: any) =>
         v._id.equals(item.variantId)
       );
       if (!variant) {
         throw new Error(`Variant not found: ${item.variantId}`);
       }
+
       totalWeight += variant.weight * item.quantity;
-      totalDimensions.length += variant.dimensions.length * item.quantity;
-      totalDimensions.width += variant.dimensions.width * item.quantity;
-      totalDimensions.height += variant.dimensions.height * item.quantity;
+
+      const itemVolume =
+        variant.dimensions.length *
+        variant.dimensions.width *
+        variant.dimensions.height;
+
+      totalVolume += itemVolume * item.quantity;
+
       subTotal += parseFloat(variant.price.toString()) * item.quantity;
     }
 
-    // Validate calculated values
-    if (totalWeight <= 0) {
-      throw new Error("Total weight must be greater than zero.");
-    }
-    if (
-      totalDimensions.length <= 0 ||
-      totalDimensions.width <= 0 ||
-      totalDimensions.height <= 0
-    ) {
-      throw new Error("Dimensions must be greater than zero.");
+    if (totalWeight <= 0 || totalVolume <= 0) {
+      throw new Error("Invalid package weight or volume.");
     }
 
-    // Get Shiprocket token
+    const cubicDimension = parseFloat(Math.cbrt(totalVolume).toFixed(2));
+    const finalDimensions = {
+      length: cubicDimension,
+      width: cubicDimension,
+      height: cubicDimension,
+    };
+
     const token = await getShipRocketToken();
-
-    // Configurable pickup postcode
     const pickupPostcode = process.env.SHIPROCKET_PICKUP_POSTCODE || "248001";
 
-    // Make API request to Shiprocket
     const response = await axios.get(
       `${shipRocketConfig.baseUrl}/v1/external/courier/serviceability/`,
       {
@@ -644,28 +634,35 @@ const calculateShippingChargesForOrder = async (
           pickup_postcode: pickupPostcode,
           delivery_postcode: postalCode,
           weight: totalWeight,
-          length: totalDimensions.length,
-          breadth: totalDimensions.width,
-          height: totalDimensions.height,
+          length: finalDimensions.length,
+          breadth: finalDimensions.width,
+          height: finalDimensions.height,
           cod: isCOD,
           declared_value: subTotal,
         },
       }
     );
 
-    const couriers = response.data.data.available_courier_companies;
-    if (!couriers || couriers.length === 0) {
-      throw new Error("No couriers available for this location.");
+    const couriers = response.data?.data?.available_courier_companies || [];
+
+    if (!couriers.length) {
+      throw new Error(
+        response.data?.message || "No couriers available for this location."
+      );
     }
 
-    // Find the courier matching the provided courier_name
     const selectedCourier = couriers.find(
       (c: any) => c.courier_name.toLowerCase() === courierName.toLowerCase()
     );
 
     if (!selectedCourier) {
-      console.error("Available couriers:", couriers);
-      throw new Error(`Courier '${courierName}' not available.`);
+      console.error(
+        "Available couriers:",
+        couriers.map((c: any) => c.courier_name)
+      );
+      throw new Error(
+        `Courier '${courierName}' not available for this location.`
+      );
     }
 
     return {
@@ -691,6 +688,7 @@ const calculateShippingChargesForOrder = async (
       });
       throw new Error(errorMessage);
     }
+
     console.error("Error calculating shipping charges for order:", error);
     throw new Error(error.message || "Failed to calculate shipping charges");
   }
