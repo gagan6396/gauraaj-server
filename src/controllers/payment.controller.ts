@@ -580,7 +580,6 @@ const getPaymentHistory = async (req: Request, res: Response) => {
   }
 };
 
-// Shiprocket Webhook for Status Updates
 const shiprocketWebhook = async (req: Request, res: Response) => {
   try {
     const {
@@ -599,47 +598,53 @@ const shiprocketWebhook = async (req: Request, res: Response) => {
       webhook_token,
     } = req.body;
 
-    // Validate webhook token (Shiprocket provides a token for security)
-    // if (webhook_token !== process.env.SHIPROCKET_WEBHOOK_TOKEN) {
-    //   return apiResponse(res, 401, false, "Invalid webhook token");
-    // }
+    console.log("Received Shiprocket Webhook:", req.body);
 
     // Validate required fields
     if (!order_id || !shipment_status || !shipment_status_id) {
       return apiResponse(res, 400, false, "Missing required webhook fields");
     }
 
-    // Map Shiprocket shipment status to internal status
     const statusMap: { [key: number]: string } = {
-      7: "Shipped", // Shiprocket "In Transit"
-      8: "Delivered", // Shiprocket "Delivered"
-      9: "Cancelled", // Shiprocket "Cancelled"
-      10: "Returned", // Shiprocket "RTO Delivered"
+      7: "Shipped",
+      8: "Delivered",
+      9: "Cancelled",
+      10: "Returned",
     };
 
-    const newShippingStatus = statusMap[shipment_status_id] || current_status || "Unknown";
+    const newShippingStatus =
+      statusMap[shipment_status_id] || current_status || "Unknown";
 
-    // Find order by Shiprocket order ID
-    const order = await orderModel.findOne({ shipRocketOrderId: order_id });
+    // Try to find order by Shiprocket order ID
+    let order = await orderModel.findOne({ shipRocketOrderId: order_id });
+
+    // Fallback: Try finding by MongoDB ObjectId if applicable
+    if (!order && mongoose.Types.ObjectId.isValid(order_id)) {
+      order = await orderModel.findById(order_id);
+    }
+
     if (!order) {
       return apiResponse(res, 404, false, "Order not found");
     }
 
-    // Find shipping record
     const shipping = await ShippingModel.findOne({ orderId: order._id });
+
     if (!shipping) {
       return apiResponse(res, 404, false, "Shipping record not found");
     }
 
-    // Update shipping and order status
+    // Update shipping info
     shipping.shippingStatus = newShippingStatus;
     shipping.courierService = courier_name || shipping.courierService;
     shipping.awbCode = awb || shipping.awbCode;
     shipping.channel = channel || shipping.channel || "N/A";
-    shipping.channelOrderId = channel_order_id || shipping.channelOrderId || "N/A";
-    shipping.estimatedDeliveryDate = etd ? new Date(etd) : shipping.estimatedDeliveryDate;
+    shipping.channelOrderId =
+      channel_order_id || shipping.channelOrderId || "N/A";
+    shipping.estimatedDeliveryDate = etd
+      ? new Date(etd)
+      : shipping.estimatedDeliveryDate;
     shipping.scans = scans
-      ? scans.map((scan: { date: string; activity: string; location: string }) => ({
+      ? scans.map((scan: any) => ({
           date: new Date(scan.date),
           activity: scan.activity,
           location: scan.location,
@@ -648,7 +653,7 @@ const shiprocketWebhook = async (req: Request, res: Response) => {
     shipping.updatedAt = new Date(current_timestamp || Date.now());
     await shipping.save();
 
-    const updatedOrder = await orderModel.findByIdAndUpdate(
+    await orderModel.findByIdAndUpdate(
       order._id,
       {
         shippingStatus: newShippingStatus,
@@ -663,9 +668,11 @@ const shiprocketWebhook = async (req: Request, res: Response) => {
       orderId: order._id.toString(),
       orderDate: order.createdAt.toLocaleDateString(),
       totalAmount: `₹${order.totalAmount.toFixed(2)}`,
-      paymentMethod: order.paymentMethod === 0 ? "Razorpay" : "Cash on Delivery",
+      paymentMethod:
+        order.paymentMethod === 0 ? "Razorpay" : "Cash on Delivery",
       shippingAddress: `${shipping.addressSnapshot.addressLine1}, ${shipping.addressSnapshot.city}, ${shipping.addressSnapshot.state}, ${shipping.addressSnapshot.postalCode}, ${shipping.addressSnapshot.country}`,
-      estimatedDeliveryDate: shipping.estimatedDeliveryDate.toLocaleDateString(),
+      estimatedDeliveryDate:
+        shipping.estimatedDeliveryDate.toLocaleDateString(),
       companyName: "Gauraaj",
       companyWebsite: "https://www.gauraaj.com/",
       supportEmail: "ghccustomercare@gmail.com",
@@ -673,7 +680,7 @@ const shiprocketWebhook = async (req: Request, res: Response) => {
       whatsAppUrl: "https://wa.me/+916397904655",
     };
 
-    // Generate product rows for email
+    // Product table
     const productRows = await Promise.all(
       order.products.map(async (orderProduct: any) => {
         const product = await productModel.findById(orderProduct.productId);
@@ -684,32 +691,24 @@ const shiprocketWebhook = async (req: Request, res: Response) => {
           variant = product.variants.find(
             (v: any) => v._id.toString() === orderProduct.variantId
           );
-          if (variant && variant.discount?.active) {
-            const discountValue = variant.discount.value;
-            if (variant.discount.type === "percentage") {
-              discountDisplay = `${discountValue}%`;
-            } else if (variant.discount.type === "flat") {
-              discountDisplay = `₹${discountValue.toFixed(2)}`;
-            }
+          if (variant?.discount?.active) {
+            const value = variant.discount.value;
+            discountDisplay =
+              variant.discount.type === "percentage"
+                ? `${value}%`
+                : `₹${value.toFixed(2)}`;
           }
         }
 
-        const productName = orderProduct.name || "Unknown Product";
-        const variantName = variant?.name || "Default Variant";
-        const sku = variant?.sku || "N/A";
-        const price = orderProduct.price || 0;
-        const quantity = orderProduct.quantity || 1;
-        const total = (price * quantity).toFixed(2);
-
         return `
           <tr>
-            <td>${productName}</td>
-            <td>${variantName}</td>
-            <td>${sku}</td>
-            <td>${quantity}</td>
-            <td>₹${price.toFixed(2)}</td>
+            <td>${orderProduct.name}</td>
+            <td>${variant?.name || "Default Variant"}</td>
+            <td>${variant?.sku || "N/A"}</td>
+            <td>${orderProduct.quantity}</td>
+            <td>₹${orderProduct.price.toFixed(2)}</td>
             <td>${discountDisplay}</td>
-            <td>₹${total}</td>
+            <td>₹${(orderProduct.price * orderProduct.quantity).toFixed(2)}</td>
           </tr>`;
       })
     ).then((rows) => rows.join(""));
@@ -729,12 +728,11 @@ const shiprocketWebhook = async (req: Request, res: Response) => {
         ${productRows}
       </table>`;
 
-    // Generate scan table for email (only for Shipped or Delivered statuses)
     let scanTable = "";
-    if (["Shipped", "Delivered"].includes(newShippingStatus) && scans && scans.length > 0) {
+    if (["Shipped", "Delivered"].includes(newShippingStatus) && scans?.length) {
       const scanRows = scans
         .map(
-          (scan: { date: string; activity: string; location: string }) => `
+          (scan: any) => `
           <tr>
             <td>${new Date(scan.date).toLocaleString()}</td>
             <td>${scan.activity}</td>
@@ -754,129 +752,108 @@ const shiprocketWebhook = async (req: Request, res: Response) => {
         </table>`;
     }
 
-    // Prepare email content based on status
+    // Email subject/message
     let emailSubject = "";
     let mainMessage = "";
-    let actionText = "View Your Order";
-    let actionUrl = `https://www.gauraaj.com/order-confirmation/${emailData.orderId}`;
-    let shopOwnerActionUrl = `https://gauraaj-admin.vercel.app/admin/orders/${emailData.orderId}`;
-
     switch (newShippingStatus) {
       case "Shipped":
         emailSubject = "Your Order Has Been Shipped";
-        mainMessage = `Great news! Your order has been shipped via ${courier_name || "our courier service"} with AWB ${awb || "N/A"}.`;
+        mainMessage = `Great news! Your order has been shipped via ${
+          courier_name || "our courier service"
+        } with AWB ${awb || "N/A"}.`;
         break;
       case "Delivered":
         emailSubject = "Your Order Has Been Delivered";
-        mainMessage = "Your order has been successfully delivered. We hope you enjoy your purchase!";
+        mainMessage = "Your order has been successfully delivered.";
         break;
       case "Cancelled":
         emailSubject = "Your Order Has Been Cancelled";
-        mainMessage = "We're sorry, but your order has been cancelled. Please contact us for more details.";
+        mainMessage = "Your order has been cancelled.";
         break;
       case "Returned":
         emailSubject = "Your Order Has Been Returned";
-        mainMessage = "Your order has been returned. Please contact us for assistance.";
+        mainMessage = "Your order has been returned.";
         break;
       default:
         emailSubject = "Order Status Update";
-        mainMessage = `Your order status has been updated to ${newShippingStatus}.`;
+        mainMessage = `Your order status is now ${newShippingStatus}.`;
     }
 
-    // Send email to customer
-    try {
-      const customerEmailBody = emailTemplate
-        .replace("Order Update", emailSubject)
-        .replace(
-          "{{greeting}}",
-          `Dear ${order.userDetails?.name || "Customer"}`
-        )
-        .replace("{{mainMessage}}", mainMessage)
-        .replace("{{orderId}}", emailData.orderId)
-        .replace("{{orderDate}}", emailData.orderDate)
-        .replace("{{totalAmount}}", emailData.totalAmount)
-        .replace("{{paymentMethod}}", emailData.paymentMethod)
-        .replace("{{shippingAddress}}", emailData.shippingAddress)
-        .replace("{{estimatedDeliveryDate}}", emailData.estimatedDeliveryDate)
-        .replace("{{additionalDetails}}", "")
-        .replace("{{productTable}}", productTable)
-        .replace("{{scanTable}}", scanTable)
-        .replace(
-          "{{closingMessage}}",
-          "Thank you for shopping with us! If you have any questions, feel free to contact us."
-        )
-        .replace("{{actionUrl}}", actionUrl)
-        .replace("{{actionText}}", actionText)
-        .replace("{{companyName}}", emailData.companyName)
-        .replace("{{companyWebsite}}", emailData.companyWebsite)
-        .replace("ghccustomercare@gmail.com", emailData.supportEmail)
-        .replace("{{whatsAppNumber}}", emailData.whatsAppNumber)
-        .replace("{{whatsAppUrl}}", emailData.whatsAppUrl);
+    const actionUrl = `https://www.gauraaj.com/order-confirmation/${emailData.orderId}`;
+    const shopOwnerActionUrl = `https://gauraaj-admin.vercel.app/admin/orders/${emailData.orderId}`;
 
-      await sendEmail(
-        order.userDetails?.email || "",
-        emailSubject,
-        customerEmailBody
-      );
-    } catch (emailError) {
-      console.error("Failed to send customer webhook email:", {
-        error:
-          emailError instanceof Error ? emailError.message : "Unknown error",
-        stack: emailError instanceof Error ? emailError.stack : "Unknown stack",
-        orderId: order._id,
-      });
-    }
+    const customerEmailBody = emailTemplate
+      .replace("Order Update", emailSubject)
+      .replace("{{greeting}}", `Dear ${order.userDetails?.name || "Customer"}`)
+      .replace("{{mainMessage}}", mainMessage)
+      .replace("{{orderId}}", emailData.orderId)
+      .replace("{{orderDate}}", emailData.orderDate)
+      .replace("{{totalAmount}}", emailData.totalAmount)
+      .replace("{{paymentMethod}}", emailData.paymentMethod)
+      .replace("{{shippingAddress}}", emailData.shippingAddress)
+      .replace("{{estimatedDeliveryDate}}", emailData.estimatedDeliveryDate)
+      .replace("{{additionalDetails}}", "")
+      .replace("{{productTable}}", productTable)
+      .replace("{{scanTable}}", scanTable)
+      .replace("{{closingMessage}}", "Thank you for shopping with us!")
+      .replace("{{actionUrl}}", actionUrl)
+      .replace("{{actionText}}", "View Your Order")
+      .replace("{{companyName}}", emailData.companyName)
+      .replace("{{companyWebsite}}", emailData.companyWebsite)
+      .replace("ghccustomercare@gmail.com", emailData.supportEmail)
+      .replace("{{whatsAppNumber}}", emailData.whatsAppNumber)
+      .replace("{{whatsAppUrl}}", emailData.whatsAppUrl);
 
-    // Send email to shop owner
-    try {
-      const shopOwnerEmailBody = emailTemplate
-        .replace("Order Update", `Order Status Update: ${newShippingStatus}`)
-        .replace("{{greeting}}", "Dear Shop Owner")
-        .replace(
-          "{{mainMessage}}",
-          `Order ${order_id} has been updated to ${newShippingStatus} status via ${courier_name || "the courier service"}.`
-        )
-        .replace("{{orderId}}", emailData.orderId)
-        .replace("{{orderDate}}", emailData.orderDate)
-        .replace("{{totalAmount}}", emailData.totalAmount)
-        .replace("{{paymentMethod}}", emailData.paymentMethod)
-        .replace("{{shippingAddress}}", emailData.shippingAddress)
-        .replace("{{estimatedDeliveryDate}}", emailData.estimatedDeliveryDate)
-        .replace(
-          "{{additionalDetails}}",
-          `<tr><th>Customer Name</th><td>${order.userDetails?.name || "N/A"}</td></tr>
-           <tr><th>Customer Phone</th><td><a href="https://wa.me/${order.userDetails?.phone || ""}">${order.userDetails?.phone || "N/A"}</a></td></tr>
-           <tr><th>AWB Code</th><td>${awb || "N/A"}</td></tr>
-           <tr><th>Channel</th><td>${channel || "N/A"}</td></tr>
-           <tr><th>Channel Order ID</th><td>${channel_order_id || "N/A"}</td></tr>`
-        )
-        .replace("{{productTable}}", productTable)
-        .replace("{{scanTable}}", scanTable)
-        .replace(
-          "{{closingMessage}}",
-          "Please take appropriate actions based on the new status. Contact support if needed."
-        )
-        .replace("{{actionUrl}}", shopOwnerActionUrl)
-        .replace("{{actionText}}", "View Order in Dashboard")
-        .replace("{{companyName}}", emailData.companyName)
-        .replace("{{companyWebsite}}", emailData.companyWebsite)
-        .replace("ghccustomercare@gmail.com", emailData.supportEmail)
-        .replace("{{whatsAppNumber}}", emailData.whatsAppNumber)
-        .replace("{{whatsAppUrl}}", emailData.whatsAppUrl);
+    await sendEmail(
+      order.userDetails?.email || "",
+      emailSubject,
+      customerEmailBody
+    );
 
-      await sendEmail(
-        "ghccustomercare@gmail.com",
-        `Order ${newShippingStatus} Notification`,
-        shopOwnerEmailBody
-      );
-    } catch (emailError) {
-      console.error("Failed to send shop owner webhook email:", {
-        error:
-          emailError instanceof Error ? emailError.message : "Unknown error",
-        stack: emailError instanceof Error ? emailError.stack : "Unknown stack",
-        orderId: order._id,
-      });
-    }
+    const shopOwnerEmailBody = emailTemplate
+      .replace("Order Update", `Order Status Update: ${newShippingStatus}`)
+      .replace("{{greeting}}", "Dear Shop Owner")
+      .replace(
+        "{{mainMessage}}",
+        `Order ${order_id} is now ${newShippingStatus}.`
+      )
+      .replace("{{orderId}}", emailData.orderId)
+      .replace("{{orderDate}}", emailData.orderDate)
+      .replace("{{totalAmount}}", emailData.totalAmount)
+      .replace("{{paymentMethod}}", emailData.paymentMethod)
+      .replace("{{shippingAddress}}", emailData.shippingAddress)
+      .replace("{{estimatedDeliveryDate}}", emailData.estimatedDeliveryDate)
+      .replace(
+        "{{additionalDetails}}",
+        `<tr><th>Customer Name</th><td>${order.userDetails?.name}</td></tr>
+         <tr><th>Customer Phone</th><td><a href="https://wa.me/${
+           order.userDetails?.phone
+         }">${order.userDetails?.phone}</a></td></tr>
+         <tr><th>AWB Code</th><td>${awb || "N/A"}</td></tr>
+         <tr><th>Channel</th><td>${channel || "N/A"}</td></tr>
+         <tr><th>Channel Order ID</th><td>${
+           channel_order_id || "N/A"
+         }</td></tr>`
+      )
+      .replace("{{productTable}}", productTable)
+      .replace("{{scanTable}}", scanTable)
+      .replace(
+        "{{closingMessage}}",
+        "Please review the order in your dashboard."
+      )
+      .replace("{{actionUrl}}", shopOwnerActionUrl)
+      .replace("{{actionText}}", "View Order in Dashboard")
+      .replace("{{companyName}}", emailData.companyName)
+      .replace("{{companyWebsite}}", emailData.companyWebsite)
+      .replace("ghccustomercare@gmail.com", emailData.supportEmail)
+      .replace("{{whatsAppNumber}}", emailData.whatsAppNumber)
+      .replace("{{whatsAppUrl}}", emailData.whatsAppUrl);
+
+    await sendEmail(
+      "ghccustomercare@gmail.com",
+      `Order ${newShippingStatus} Notification`,
+      shopOwnerEmailBody
+    );
 
     return apiResponse(res, 200, true, "Webhook processed successfully");
   } catch (error: any) {
@@ -893,6 +870,8 @@ const shiprocketWebhook = async (req: Request, res: Response) => {
     );
   }
 };
+
+export default shiprocketWebhook;
 
 export {
   createOrder,
