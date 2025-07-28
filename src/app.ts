@@ -25,6 +25,7 @@ import reelRoute from "./routes/reel.route";
 import reviewRoute from "./routes/review.route";
 import salesRoute from "./routes/sales.route";
 import shipRocketRoute from "./routes/shipRocket.route";
+import sliderRoute from "./routes/slider.routes";
 import supplierAnalyticsRoute from "./routes/supplierAnalytics.route";
 import supplierRoute from "./routes/supplierauth.route";
 import supplierProductRoute from "./routes/supplierProduct.route";
@@ -69,6 +70,8 @@ app.use("/api/v1/reels", reelRoute);
 app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/blogs", blogRoute);
 app.use("/api/v1/publicReview", reviewRouter);
+app.use("/api/v1/sliders", sliderRoute);
+
 // Hello Commit
 export default app;
 
