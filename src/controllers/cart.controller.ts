@@ -22,7 +22,7 @@ const getUserCart = async (req: any, res: Response) => {
       },
     });
 
-    if (!cart || cart.products.length === 0) {
+    if (!cart) {
       return apiResponse(res, 404, false, "Cart is empty.");
     }
 

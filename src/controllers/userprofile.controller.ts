@@ -211,7 +211,7 @@ const FetchUserWishlist = async (req: any, res: Response) => {
       })
       .populate("product_id");
 
-    if (!wishlistForUser && wishlistForUser.length === 0) {
+    if (!wishlistForUser) {
       return apiResponse(res, 404, false, "Wishlist not found");
     }
 
