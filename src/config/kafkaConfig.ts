@@ -1,16 +1,25 @@
 import { Kafka } from "kafkajs";
 
-// Use environment variable for broker address, default to localhost:9092 for local dev if needed
-const kafka = new Kafka({
-  clientId: "shiprocket-service",
-  brokers: [process.env.KAFKA_BROKER || "localhost:9092"],
-});
+const kafkaEnabled = process.env.ENABLE_KAFKA === "true";
 
-export const producer = kafka.producer();
+// Create Kafka instance ONLY if enabled
+const kafka = kafkaEnabled
+  ? new Kafka({
+      clientId: "shiprocket-service",
+      brokers: [process.env.KAFKA_BROKER || "localhost:9092"],
+    })
+  : null;
 
-// Function to initialize Kafka producer with retry mechanism
+export const producer = kafka ? kafka.producer() : null;
+
+// Initialize Kafka producer only when enabled
 export const initializeKafka = async () => {
-  let retries = 5; // Retry up to 5 times
+  if (!kafkaEnabled || !producer) {
+    console.log("Kafka disabled. Skipping Kafka initialization.");
+    return;
+  }
+
+  let retries = 5;
   while (retries > 0) {
     try {
       await producer.connect();
@@ -22,49 +31,33 @@ export const initializeKafka = async () => {
       if (retries === 0) {
         console.error("Failed to connect to Kafka after several attempts.");
         throw new Error("Failed to connect to Kafka");
-      } else {
-        console.log(
-          `Retrying to connect to Kafka... Attempts remaining: ${retries}`
-        );
-        await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second before retrying
       }
+      await new Promise((r) => setTimeout(r, 1000));
     }
   }
 };
 
-// Function to send messages to Kafka with error handling
+// Send message ONLY if Kafka is enabled
 export const sendMessageToKafka = async (topic: string, message: any) => {
-  try {
-    await producer.send({
-      topic,
-      messages: [
-        {
-          key: message.orderId,
-          value: JSON.stringify(message),
-        },
-      ],
-    });
-    console.log(`Message sent to Kafka topic ${topic}`);
-  } catch (error) {
-    console.error("Error sending message to Kafka:", error);
-    throw new Error("Error sending message to Kafka");
+  if (!kafkaEnabled || !producer) {
+    console.log("Kafka disabled. Skipping message send.");
+    return;
   }
+
+  await producer.send({
+    topic,
+    messages: [
+      {
+        key: message.orderId,
+        value: JSON.stringify(message),
+      },
+    ],
+  });
 };
 
-// Event listener for producer errors
-producer.on("producer.connect", () => {
-  console.log("Kafka Producer connected successfully.");
-});
-
-producer.on("producer.disconnect", () => {
-  console.log("Kafka Producer disconnected.");
-});
-
-producer.on("producer.network.request_timeout", (event) => {
-  console.error("Kafka Producer request timeout:", event);
-});
-
-// Ensure Kafka Producer is connected before using it in other parts of your application
-initializeKafka().catch((error) => {
-  console.error("Failed to initialize Kafka producer:", error);
-});
+// 🔥 IMPORTANT: only auto-init if enabled
+if (kafkaEnabled) {
+  initializeKafka().catch((error) => {
+    console.error("Failed to initialize Kafka producer:", error);
+  });
+}

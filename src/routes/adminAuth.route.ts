@@ -1,5 +1,5 @@
 import express, { Router } from "express";
-import { AdminLogin, AdminLogout } from "../controllers/adminAuth.controller";
+import { AdminLogin, AdminLogout,AdminRegister } from "../controllers/adminAuth.controller";
 import validateRequest from "../middlewares/validateSchema";
 import { adminLoginSchema } from "../Schema/admin.schema";
 
@@ -11,5 +11,7 @@ adminRoute.post(
   AdminLogin
 );
 adminRoute.post("/auth/logout", AdminLogout);
+adminRoute.post("/auth/register", AdminRegister);
+
 
 export default adminRoute;

@@ -96,13 +96,24 @@ const RegisterUser = async (req: Request, res: Response) => {
 
 const LoginUser = async (req: Request, res: Response) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
+    let { phone, email, password } = req.body;
+    console.log("DAATA :: ",phone, email, password);
+    // Check if at least one identifier (email or phone) and password are provided
+    if ((!email && !phone) || !password) {
       return apiResponse(res, 400, false, "Please fill all fields");
     }
 
-    // Check if user exists
-    const userExist = await userModel.findOne({ email });
+    // Add +91 prefix if phone is provided and doesn't start with +91
+    if (phone && !phone.startsWith('+91')) {
+      phone = `+91${phone}`;
+    }
+
+    // Check if user exists by email or phone
+    const query: any = { $or: [] };
+    if (email) query.$or.push({ email: email });
+    if (phone) query.$or.push({ phone: phone });
+
+    const userExist = await userModel.findOne(query);
     if (!userExist) {
       return apiResponse(res, 404, false, "User not found");
     }

@@ -55,4 +55,52 @@ const AdminLogout = async (req: Request, res: Response) => {
   }
 };
 
-export { AdminLogin, AdminLogout };
+
+const AdminRegister = async (req: Request, res: Response) => {
+  try {
+    const { email, password, username } = req.body;
+
+    if (!email || !password || !username) {
+      return apiResponse(
+        res,
+        400,
+        false,
+        "Name, Email and Password are required fields"
+      );
+    }
+
+    // Check if admin already exists
+    const existingAdmin = await adminModel.findOne({ email });
+
+    if (existingAdmin) {
+      return apiResponse(res, 409, false, "Admin already exists");
+    }
+
+    // Hash password
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // Create admin
+    const newAdmin = await adminModel.create({
+      username,
+      email,
+      password: hashedPassword,
+    });
+
+    const token = generateToken({
+      _id: newAdmin._id,
+      role: "Admin",
+    });
+
+    return apiResponse(res, 201, true, "Admin registered successfully", {
+      token,
+      adminId: newAdmin._id,
+    });
+  } catch (error) {
+    console.error("Error while registering admin", error);
+    return apiResponse(res, 500, false, "Error registering admin");
+  }
+};
+
+
+export { AdminLogin, AdminLogout, AdminRegister };
