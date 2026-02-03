@@ -5,7 +5,8 @@ import { connectRedis } from "./src/config/redisClient";
 
 dotenv.config();
 
-const PORT = process.env.PORT || 4001;
+//const PORT = process.env.PORT || 4001;
+const PORT = Number(process.env.PORT) || 4001;
 const DbURL = process.env.DATABASE_URL;
 
 const startServer = async () => {
