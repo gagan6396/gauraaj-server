@@ -18,7 +18,10 @@ services:
       - key: KAFKA_PASSWORD
         sync: false
 
-  - type: redis
-    name: gauraaj-redis
+databases: []
+
+redis:
+  - name: gauraaj-redis
     plan: free
     maxmemoryPolicy: allkeys-lru
+    ipAllowList: []        # ← This was missing! Empty = allow all
