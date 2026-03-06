@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: gauraaj-backend
+    runtime: docker
+    branch: main
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: KAFKA_BROKER
+        sync: false
+      - key: KAFKA_USERNAME
+        sync: false
+      - key: KAFKA_PASSWORD
+        sync: false
+
+  - type: redis
+    name: gauraaj-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru
